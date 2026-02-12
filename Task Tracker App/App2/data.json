@@ -1,0 +1,37 @@
+{
+  "users": {
+    "Anish": {
+      "password": "Anish",
+      "projects": {
+        "0e8b2c90-1aa0-4a8c-bccb-994cae2df11b": {
+          "id": "0e8b2c90-1aa0-4a8c-bccb-994cae2df11b",
+          "name": "Project 1",
+          "tasks": [],
+          "status": "not completed"
+        }
+      },
+      "project_count": 1
+    },
+    "Mads": {
+      "password": "Mads",
+      "projects": {
+        "6f5845c3-bce4-4add-a918-1155134939bd": {
+          "id": "6f5845c3-bce4-4add-a918-1155134939bd",
+          "name": "Project 1",
+          "tasks": [
+            {
+              "id": "a86cd3d2-9e00-4e95-ad08-aaf2cd506606",
+              "title": "Task 1",
+              "desc": "Task 1 Description",
+              "priority": "High",
+              "due_date": "2025-12-02",
+              "status": "pending"
+            }
+          ],
+          "status": "not completed"
+        }
+      },
+      "project_count": 1
+    }
+  }
+}

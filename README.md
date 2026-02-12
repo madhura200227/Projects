@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Web Data Scraper - Python Edition
 
 A powerful web scraper built with Python, Flask, and BeautifulSoup that allows you to search any topic and extract structured data from the web.
@@ -201,3 +202,7 @@ If you encounter issues:
 ---
 
 **Happy Scraping! 🔍**
+=======
+# Projects
+projects I have contributed
+>>>>>>> fd18f164622d9792dfb6aab0e0a4d54109e6cd02
