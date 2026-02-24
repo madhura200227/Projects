@@ -1,0 +1,71 @@
+# ============================================================
+# InfraGuard AI v2 – Python Dependencies
+# ============================================================
+# Install: pip install -r requirements.txt
+# Minimum Python: 3.11+
+
+# ── Core API framework ────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9        # file uploads
+websockets==12.0               # WebSocket support
+
+# ── Data validation ───────────────────────────────────────────
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# ── HTTP client (async) ───────────────────────────────────────
+httpx[http2]==0.27.0           # all external API calls
+
+# ── Caching ───────────────────────────────────────────────────
+aioredis==2.0.1                # async Redis client
+
+# ── Database (async Postgres) ─────────────────────────────────
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.30
+alembic==1.13.1                # migrations
+
+# ── ML / Data science ─────────────────────────────────────────
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.4.2
+xgboost==2.0.3                 # tabular model (optional; falls back to heuristic)
+scipy==1.13.0                  # Laplacian sharpness in image heuristic
+
+# ── Image processing ──────────────────────────────────────────
+Pillow==10.3.0                 # image open/convert
+opencv-python-headless==4.9.0.80  # heatmap generation (optional)
+
+# ── Deep learning (optional – only needed for CNN weights) ────
+# torch==2.3.0                 # uncomment if using CNN weights
+# torchvision==0.18.0
+
+# ── Background tasks ──────────────────────────────────────────
+celery[redis]==5.4.0           # periodic task queue (optional)
+flower==2.0.1                  # Celery web monitor (optional)
+
+# ── Auth / Security ───────────────────────────────────────────
+python-jose[cryptography]==3.3.0   # JWT
+passlib[bcrypt]==1.7.4
+
+# ── Observability ─────────────────────────────────────────────
+prometheus-fastapi-instrumentator==6.1.0   # Prometheus metrics
+sentry-sdk[fastapi]==1.45.0                # error tracking (optional)
+
+# ── Utilities ─────────────────────────────────────────────────
+python-dotenv==1.0.1
+orjson==3.10.3                 # fast JSON serialisation
+anyio==4.3.0                   # async helpers
+tenacity==8.3.0                # retry logic
+
+# ── PDF report generation (optional) ─────────────────────────
+# reportlab==4.2.0
+# weasyprint==62.3
+
+# ── Dev / test ────────────────────────────────────────────────
+pytest==8.2.0
+pytest-asyncio==0.23.6
+httpx==0.27.0                  # test client
+coverage==7.5.1
+black==24.4.2
+ruff==0.4.4

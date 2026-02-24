@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>InfraGuard AI – Infrastructure Failure Prediction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #050a0f;
+    --panel: #0b1520;
+    --panel2: #0f1e2e;
+    --border: rgba(0,200,255,0.12);
+    --accent: #00c8ff;
+    --accent2: #ff4a6b;
+    --accent3: #00ff9d;
+    --warn: #ffb700;
+    --text: #c8dde8;
+    --muted: #4a6070;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-body: 'Inter', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── NAV ─── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    background: rgba(5,10,15,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #005f80);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo-text { font-family: var(--font-head); font-weight: 800; font-size: 18px; color: #fff; letter-spacing: -0.5px; }
+  .logo-text span { color: var(--accent); }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+    background: transparent; color: var(--muted); border: none;
+    font-family: var(--font-body);
+  }
+  .nav-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .nav-tab.active { background: rgba(0,200,255,0.1); color: var(--accent); }
+  .nav-status {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--accent3);
+  }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent3); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+
+  /* ─── MAIN LAYOUT ─── */
+  main { position: relative; z-index: 1; }
+
+  /* ─── HERO ─── */
+  .hero {
+    padding: 60px 32px 40px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 100px;
+    border: 1px solid rgba(0,200,255,0.3);
+    background: rgba(0,200,255,0.06);
+    font-family: var(--font-mono); font-size: 11px; color: var(--accent);
+    margin-bottom: 24px; letter-spacing: 1px;
+  }
+  .hero h1 {
+    font-family: var(--font-head); font-size: clamp(36px, 6vw, 72px);
+    font-weight: 800; line-height: 1.05;
+    color: #fff; letter-spacing: -2px; margin-bottom: 18px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero p { font-size: 16px; color: var(--muted); max-width: 560px; line-height: 1.7; }
+
+  /* ─── CITY SELECTOR ─── */
+  .city-bar {
+    display: flex; justify-content: center; gap: 12px;
+    padding: 24px 32px; flex-wrap: wrap;
+  }
+  .city-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel); color: var(--text);
+    cursor: pointer; transition: all 0.25s;
+    font-family: var(--font-body); font-size: 14px; font-weight: 500;
+  }
+  .city-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,200,255,0.06); }
+  .city-btn.active { border-color: var(--accent); color: #fff; background: rgba(0,200,255,0.15); }
+  .city-flag { font-size: 18px; }
+
+  /* ─── DASHBOARD GRID ─── */
+  .dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto;
+    gap: 16px;
+    padding: 0 32px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .panel:hover { border-color: rgba(0,200,255,0.25); }
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.3;
+  }
+  .panel-title {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* Spans */
+  .span2 { grid-column: span 2; }
+  .span3 { grid-column: span 3; }
+
+  /* ─── RISK GAUGE ─── */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; }
+  .gauge-svg { width: 200px; height: 120px; }
+  .gauge-num {
+    font-family: var(--font-head); font-size: 52px; font-weight: 800;
+    color: #fff; line-height: 1; margin-top: -8px;
+  }
+  .gauge-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .risk-badge {
+    margin-top: 12px; padding: 6px 16px; border-radius: 6px;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    letter-spacing: 1px;
+  }
+  .risk-HIGH { background: rgba(255,74,107,0.15); color: var(--accent2); border: 1px solid rgba(255,74,107,0.3); }
+  .risk-MEDIUM { background: rgba(255,183,0,0.12); color: var(--warn); border: 1px solid rgba(255,183,0,0.3); }
+  .risk-LOW { background: rgba(0,255,157,0.1); color: var(--accent3); border: 1px solid rgba(0,255,157,0.3); }
+
+  /* ─── METRIC CARDS ─── */
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .metric {
+    background: var(--panel2); border-radius: 10px; padding: 16px;
+    border: 1px solid var(--border);
+  }
+  .metric-val {
+    font-family: var(--font-head); font-size: 28px; font-weight: 700; color: #fff;
+  }
+  .metric-val.accent { color: var(--accent); }
+  .metric-val.warn { color: var(--warn); }
+  .metric-val.danger { color: var(--accent2); }
+  .metric-val.safe { color: var(--accent3); }
+  .metric-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .metric-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.06); margin-top: 8px; overflow: hidden; }
+  .metric-bar-fill { height: 100%; border-radius: 2px; transition: width 1.2s ease; }
+
+  /* ─── MAP ─── */
+  .map-container {
+    position: relative;
+    background: #07121c;
+    border-radius: 12px;
+    overflow: hidden;
+    height: 320px;
+    cursor: grab;
+    user-select: none;
+  }
+  .map-container.panning { cursor: grabbing; }
+  #worldMap { width: 100%; height: 100%; }
+  .map-controls {
+    position: absolute; bottom: 12px; right: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+    z-index: 10;
+  }
+  .map-ctrl-btn {
+    width: 32px; height: 32px; border-radius: 6px;
+    background: rgba(5,10,15,0.85); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); color: var(--text);
+    cursor: pointer; font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .map-ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .map-overlay {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(5,10,15,0.85); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; font-family: var(--font-mono); font-size: 11px;
+  }
+  .map-legend { display: flex; flex-direction: column; gap: 6px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ─── TIMELINE ─── */
+  .timeline-bar { position: relative; height: 48px; margin: 12px 0; }
+  .timeline-track {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    left: 0; right: 0; height: 6px;
+    background: rgba(255,255,255,0.05); border-radius: 3px;
+  }
+  .timeline-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent3), var(--warn), var(--accent2));
+    transition: width 1.5s ease;
+  }
+  .timeline-marker {
+    position: absolute; top: 0; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .marker-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; }
+  .marker-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted); white-space: nowrap; }
+
+  /* ─── RECOMMENDATIONS ─── */
+  .rec-list { display: flex; flex-direction: column; gap: 10px; }
+  .rec-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px; background: var(--panel2); border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .rec-item:hover { border-color: rgba(0,200,255,0.3); }
+  .rec-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+  .rec-body { flex: 1; }
+  .rec-title { font-size: 13px; font-weight: 500; color: #fff; margin-bottom: 3px; }
+  .rec-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .rec-priority {
+    font-family: var(--font-mono); font-size: 9px; padding: 2px 7px;
+    border-radius: 4px; align-self: flex-start; flex-shrink: 0;
+  }
+  .priority-CRITICAL { background: rgba(255,74,107,0.15); color: var(--accent2); }
+  .priority-HIGH { background: rgba(255,183,0,0.12); color: var(--warn); }
+  .priority-MEDIUM { background: rgba(0,200,255,0.1); color: var(--accent); }
+
+  /* ─── CHARTS ─── */
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ─── IMAGE UPLOAD ─── */
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 32px; text-align: center;
+    cursor: pointer; transition: all 0.25s;
+    background: rgba(0,200,255,0.02);
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(0,200,255,0.06); }
+  .upload-zone.has-image { padding: 0; border-style: solid; }
+  .upload-icon { font-size: 32px; margin-bottom: 10px; }
+  .upload-label { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+  .upload-sub { font-size: 12px; color: var(--muted); }
+  #previewImg { width: 100%; border-radius: 10px; display: none; max-height: 200px; object-fit: cover; }
+  #damageCanvas { width: 100%; border-radius: 10px; display: none; max-height: 200px; }
+  .damage-results { margin-top: 16px; display: none; }
+  .damage-score {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: var(--panel2); border-radius: 8px;
+    border: 1px solid var(--border); margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .damage-score span:last-child { font-family: var(--font-mono); font-weight: 600; }
+
+  /* ─── SHAP ─── */
+  .shap-bar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .shap-label { font-size: 12px; color: var(--text); width: 140px; flex-shrink: 0; }
+  .shap-track {
+    flex: 1; height: 20px; background: rgba(255,255,255,0.04);
+    border-radius: 4px; overflow: hidden; position: relative;
+  }
+  .shap-fill {
+    height: 100%; border-radius: 4px;
+    transition: width 1.5s ease;
+    display: flex; align-items: center; padding-left: 6px;
+  }
+  .shap-fill-pos { background: linear-gradient(90deg, rgba(255,74,107,0.6), rgba(255,74,107,0.3)); }
+  .shap-fill-neg { background: linear-gradient(90deg, rgba(0,255,157,0.5), rgba(0,255,157,0.2)); }
+  .shap-val { font-family: var(--font-mono); font-size: 10px; color: var(--muted); width: 48px; text-align: right; }
+
+  /* ─── ALERTS ─── */
+  .alert-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
+  .alert-list::-webkit-scrollbar { width: 4px; }
+  .alert-list::-webkit-scrollbar-track { background: transparent; }
+  .alert-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .alert-item {
+    display: flex; gap: 10px; align-items: center;
+    padding: 10px 12px; border-radius: 8px;
+    font-size: 12px; animation: slideIn 0.4s ease;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  .alert-CRITICAL { background: rgba(255,74,107,0.08); border: 1px solid rgba(255,74,107,0.2); }
+  .alert-HIGH { background: rgba(255,183,0,0.07); border: 1px solid rgba(255,183,0,0.2); }
+  .alert-INFO { background: rgba(0,200,255,0.06); border: 1px solid rgba(0,200,255,0.15); }
+  .alert-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .alert-CRITICAL .alert-dot { background: var(--accent2); }
+  .alert-HIGH .alert-dot { background: var(--warn); }
+  .alert-INFO .alert-dot { background: var(--accent); }
+  .alert-time { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-left: auto; flex-shrink: 0; }
+
+  /* ─── COST TABLE ─── */
+  .cost-table { width: 100%; border-collapse: collapse; }
+  .cost-table th {
+    font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    padding: 8px 12px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .cost-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .cost-table tr:last-child td { border-bottom: none; }
+  .cost-rank {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .rank-1 { background: rgba(255,74,107,0.2); color: var(--accent2); }
+  .rank-2 { background: rgba(255,183,0,0.15); color: var(--warn); }
+  .rank-3 { background: rgba(0,200,255,0.1); color: var(--accent); }
+  .rank-4, .rank-5 { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+  /* ─── TABS ─── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab-btn {
+    padding: 7px 16px; border-radius: 6px; font-size: 12px;
+    cursor: pointer; background: transparent;
+    color: var(--muted); border: 1px solid transparent;
+    font-family: var(--font-body); transition: all 0.2s;
+  }
+  .tab-btn.active { background: rgba(0,200,255,0.1); color: var(--accent); border-color: rgba(0,200,255,0.2); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ─── SECTION HEADER ─── */
+  .section-header {
+    padding: 32px 32px 16px; max-width: 1400px; margin: 0 auto;
+  }
+  .section-title {
+    font-family: var(--font-head); font-size: 22px; font-weight: 700;
+    color: #fff; letter-spacing: -0.5px;
+  }
+  .section-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* ─── LOADING ANIMATION ─── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--panel2) 25%, rgba(255,255,255,0.04) 50%, var(--panel2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .dashboard { grid-template-columns: 1fr 1fr; }
+    .span3 { grid-column: span 2; }
+  }
+  @media (max-width: 600px) {
+    .dashboard { grid-template-columns: 1fr; padding: 0 16px 24px; }
+    .span2, .span3 { grid-column: span 1; }
+    nav { padding: 12px 16px; }
+    .hero { padding: 40px 16px 24px; }
+  }
+
+  /* ─── INFRASTRUCTURE TYPE SELECTOR ─── */
+  .infra-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .infra-tab {
+    padding: 8px 16px; border-radius: 8px; font-size: 12px;
+    cursor: pointer; background: var(--panel2); color: var(--muted);
+    border: 1px solid var(--border); transition: all 0.2s;
+    font-family: var(--font-body);
+  }
+  .infra-tab:hover { color: var(--text); }
+  .infra-tab.active { background: rgba(0,200,255,0.1); color: var(--accent); border-color: rgba(0,200,255,0.3); }
+
+  /* PDF Button */
+  .btn-primary {
+    padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; background: linear-gradient(135deg, var(--accent), #007fa8);
+    color: #000; border: none; font-family: var(--font-body);
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: opacity 0.2s; text-decoration: none;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-outline {
+    padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; background: transparent;
+    color: var(--accent); border: 1px solid rgba(0,200,255,0.4);
+    font-family: var(--font-body); display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.2s;
+  }
+  .btn-outline:hover { background: rgba(0,200,255,0.08); }
+
+  .actions-bar {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;
+    padding: 0 32px; max-width: 1400px; margin-left: auto; margin-right: auto;
+    margin-bottom: 32px;
+  }
+
+  /* carbon badge */
+  .carbon-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px;
+    background: rgba(0,255,157,0.07); border: 1px solid rgba(0,255,157,0.2);
+    font-family: var(--font-mono); font-size: 11px; color: var(--accent3);
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div class="logo-text">Infra<span>Guard</span> AI</div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('dashboard')">Dashboard</button>
+    <button class="nav-tab" onclick="showSection('analysis')">Analysis</button>
+    <button class="nav-tab" onclick="showSection('upload')">Image Scan</button>
+    <button class="nav-tab" onclick="showSection('alerts')">Alerts</button>
+  </div>
+  <div class="nav-status">
+    <div class="pulse"></div>
+    LIVE · 4 CITIES MONITORED
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">⚡ MULTIMODAL AI · SATELLITE + TRAFFIC + AQI + WEATHER</div>
+  <h1>Predict Infrastructure<br /><span>Failure Before It Happens</span></h1>
+  <p>AI-powered risk assessment for roads, bridges, and pipelines using real-time satellite imagery, traffic patterns, flood history, and environmental data.</p>
+</div>
+
+<!-- CITY SELECTOR -->
+<div class="city-bar">
+  <button class="city-btn active" onclick="selectCity('mumbai', this)"><span class="city-flag">🇮🇳</span> Mumbai</button>
+  <button class="city-btn" onclick="selectCity('pune', this)"><span class="city-flag">🇮🇳</span> Pune</button>
+  <button class="city-btn" onclick="selectCity('newyork', this)"><span class="city-flag">🇺🇸</span> New York</button>
+  <button class="city-btn" onclick="selectCity('tokyo', this)"><span class="city-flag">🇯🇵</span> Tokyo</button>
+</div>
+
+<!-- SEARCH BAR -->
+<div style="max-width:1400px;margin:0 auto;padding:0 32px 16px;">
+  <div style="position:relative;max-width:540px;margin:0 auto;">
+    <div style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none;">🔍</div>
+    <input id="infraSearch" type="text" placeholder="Search road, bridge, pipeline, e.g. 'Western Express Highway'..." 
+      style="width:100%;padding:12px 44px 12px 42px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;transition:border-color 0.2s;"
+      oninput="handleSearch(this.value)" onfocus="this.parentElement.querySelector('.search-suggestions').style.display='block'" onblur="setTimeout(()=>this.parentElement.querySelector('.search-suggestions').style.display='none',200)"
+    />
+    <div class="search-suggestions" id="searchSuggestions" style="display:none;position:absolute;top:calc(100%+4px);left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;z-index:50;overflow:hidden;max-height:240px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);"></div>
+  </div>
+  <!-- Search Result Badge -->
+  <div id="searchResult" style="display:none;max-width:540px;margin:10px auto 0;padding:10px 16px;background:rgba(0,200,255,0.08);border:1px solid rgba(0,200,255,0.25);border-radius:8px;font-size:13px;color:var(--accent);display:flex;align-items:center;gap:10px;">
+    <span id="searchResultText"></span>
+    <button onclick="clearSearch()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>
+  </div>
+</div>
+
+<!-- INFRA TYPE -->
+<div style="max-width:1400px;margin:0 auto;padding: 0 32px 8px;">
+  <div class="infra-tabs">
+    <button class="infra-tab active" onclick="selectInfra('roads', this)">🛣️ Roads</button>
+    <button class="infra-tab" onclick="selectInfra('bridges', this)">🌉 Bridges</button>
+    <button class="infra-tab" onclick="selectInfra('pipelines', this)">🔧 Pipelines</button>
+  </div>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div id="section-dashboard">
+
+<!-- MAIN DASHBOARD GRID -->
+<div class="dashboard">
+
+  <!-- Risk Gauge -->
+  <div class="panel">
+    <div class="panel-title">🎯 Failure Risk Score</div>
+    <div class="gauge-wrap">
+      <svg class="gauge-svg" viewBox="0 0 200 120">
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#00ff9d"/>
+            <stop offset="50%" style="stop-color:#ffb700"/>
+            <stop offset="100%" style="stop-color:#ff4a6b"/>
+          </linearGradient>
+        </defs>
+        <!-- Track -->
+        <path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12" stroke-linecap="round"/>
+        <!-- Fill -->
+        <path id="gaugeFill" d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round"
+          stroke-dasharray="251.2" stroke-dashoffset="62.8"/>
+        <!-- Needle -->
+        <g id="gaugeNeedle" transform="rotate(72, 100, 110)">
+          <line x1="100" y1="110" x2="100" y2="40" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="100" cy="110" r="5" fill="white"/>
+        </g>
+      </svg>
+      <div class="gauge-num" id="riskNum">87%</div>
+      <div class="gauge-label">Failure Probability</div>
+      <div class="risk-badge risk-HIGH" id="riskBadge">⚠ HIGH RISK</div>
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="panel">
+    <div class="panel-title">📊 Key Indicators</div>
+    <div class="metrics-grid">
+      <div class="metric">
+        <div class="metric-val warn" id="m-traffic">94K</div>
+        <div class="metric-lbl">Daily Traffic Count</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="b-traffic" style="width:88%;background:#ffb700"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-val danger" id="m-aqi">178</div>
+        <div class="metric-lbl">AQI Level (Unhealthy)</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="b-aqi" style="width:72%;background:#ff4a6b"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-val accent" id="m-flood">14</div>
+        <div class="metric-lbl">Flood Events (5yr)</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="b-flood" style="width:85%;background:#00c8ff"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-val danger" id="m-heavy">38%</div>
+        <div class="metric-lbl">Heavy Vehicle Ratio</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="b-heavy" style="width:38%;background:#ff4a6b"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Predicted Failure Timeline -->
+  <div class="panel">
+    <div class="panel-title">⏱ Predicted Failure Timeline</div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-family:var(--font-head);font-size:42px;font-weight:800;color:#fff;" id="failureTime">2.1</div>
+      <div style="font-size:13px;color:var(--muted)">Years to Critical Failure</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent);margin-top:4px;" id="failureDate">ETA: March 2027</div>
+    </div>
+    <div class="timeline-bar">
+      <div class="timeline-track">
+        <div class="timeline-fill" id="timelineFill" style="width:72%"></div>
+      </div>
+      <div class="timeline-marker" id="marker-now" style="left:0%">
+        <div class="marker-dot" style="background:var(--accent3);border-color:var(--accent3)"></div>
+        <div class="marker-label">NOW</div>
+      </div>
+      <div class="timeline-marker" id="marker-warn" style="left:50%">
+        <div class="marker-dot" style="background:var(--warn);border-color:var(--warn)"></div>
+        <div class="marker-label">WARNING</div>
+      </div>
+      <div class="timeline-marker" id="marker-fail" style="left:100%">
+        <div class="marker-dot" style="background:var(--accent2);border-color:var(--accent2)"></div>
+        <div class="marker-label">FAILURE</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:8px;">
+      <span id="t-now">Feb 2026</span>
+      <span id="t-warn">Sep 2026</span>
+      <span id="t-fail">Mar 2027</span>
+    </div>
+  </div>
+
+  <!-- World Map -->
+  <div class="panel span2">
+    <div class="panel-title">🗺 Global Infrastructure Risk Map</div>
+    <div class="map-container" style="height:360px;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 60%, #0a1f35 0%, #050a0f 100%);" id="mapContainer">
+      <!-- SVG World Map -->
+      <svg id="worldMapSVG" viewBox="0 0 1000 500" style="width:100%;height:100%;display:block;transition:transform 0.15s ease;" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="bigGlow">
+            <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <radialGradient id="markerGradCrit" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:#ff4a6b;stop-opacity:0.9"/>
+            <stop offset="100%" style="stop-color:#ff4a6b;stop-opacity:0"/>
+          </radialGradient>
+          <radialGradient id="markerGradWarn" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:#ffb700;stop-opacity:0.9"/>
+            <stop offset="100%" style="stop-color:#ffb700;stop-opacity:0"/>
+          </radialGradient>
+          <radialGradient id="markerGradSafe" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:#00ff9d;stop-opacity:0.9"/>
+            <stop offset="100%" style="stop-color:#00ff9d;stop-opacity:0"/>
+          </radialGradient>
+        </defs>
+        <!-- Graticules (lat/lon lines) -->
+        <g stroke="rgba(0,200,255,0.06)" stroke-width="0.5" fill="none">
+          <!-- Longitude lines every 30deg -->
+          <line x1="0" y1="0" x2="0" y2="500"/><line x1="83" y1="0" x2="83" y2="500"/>
+          <line x1="167" y1="0" x2="167" y2="500"/><line x1="250" y1="0" x2="250" y2="500"/>
+          <line x1="333" y1="0" x2="333" y2="500"/><line x1="417" y1="0" x2="417" y2="500"/>
+          <line x1="500" y1="0" x2="500" y2="500"/><line x1="583" y1="0" x2="583" y2="500"/>
+          <line x1="667" y1="0" x2="667" y2="500"/><line x1="750" y1="0" x2="750" y2="500"/>
+          <line x1="833" y1="0" x2="833" y2="500"/><line x1="917" y1="0" x2="917" y2="500"/>
+          <line x1="1000" y1="0" x2="1000" y2="500"/>
+          <!-- Latitude lines every 30deg -->
+          <line x1="0" y1="83" x2="1000" y2="83"/><line x1="0" y1="167" x2="1000" y2="167"/>
+          <line x1="0" y1="250" x2="1000" y2="250"/><line x1="0" y1="333" x2="1000" y2="333"/>
+          <line x1="0" y1="417" x2="1000" y2="417"/>
+          <!-- Equator brighter -->
+          <line x1="0" y1="250" x2="1000" y2="250" stroke="rgba(0,200,255,0.12)" stroke-width="1"/>
+        </g>
+        <!-- ── CONTINENTS (proper simplified paths) ── -->
+        <g fill="rgba(0,180,255,0.07)" stroke="rgba(0,200,255,0.2)" stroke-width="0.8">
+          <!-- North America -->
+          <path d="M 95,60 L 110,55 L 145,50 L 200,55 L 225,65 L 235,75 L 240,100 L 235,130 L 220,155 L 205,180 L 195,200 L 185,215 L 175,220 L 165,215 L 155,205 L 145,200 L 135,195 L 125,185 L 115,175 L 110,160 L 105,145 L 100,130 L 95,115 L 90,100 L 88,80 Z"/>
+          <!-- Greenland -->
+          <path d="M 195,30 L 230,25 L 250,35 L 245,60 L 225,70 L 200,65 L 190,50 Z"/>
+          <!-- Central America -->
+          <path d="M 165,215 L 175,225 L 178,240 L 170,250 L 160,245 L 155,235 L 155,220 Z"/>
+          <!-- South America -->
+          <path d="M 165,250 L 195,245 L 220,255 L 240,275 L 245,300 L 242,330 L 235,355 L 220,375 L 205,390 L 190,400 L 178,410 L 170,400 L 160,385 L 155,365 L 150,340 L 148,315 L 150,290 L 155,268 Z"/>
+          <!-- Europe -->
+          <path d="M 455,55 L 480,50 L 510,48 L 530,55 L 540,70 L 535,90 L 520,105 L 505,110 L 495,120 L 485,125 L 475,120 L 465,110 L 458,95 L 452,80 Z"/>
+          <!-- Scandinavia -->
+          <path d="M 490,30 L 510,25 L 525,35 L 530,55 L 510,48 L 490,45 Z"/>
+          <!-- UK -->
+          <path d="M 450,65 L 460,60 L 468,68 L 464,82 L 454,85 L 447,78 Z"/>
+          <!-- Africa -->
+          <path d="M 458,145 L 490,138 L 525,140 L 550,155 L 560,175 L 558,200 L 555,225 L 550,250 L 540,275 L 525,300 L 508,320 L 495,330 L 480,330 L 468,320 L 455,305 L 445,280 L 440,255 L 438,230 L 440,205 L 445,180 L 450,165 Z"/>
+          <!-- Madagascar -->
+          <path d="M 555,270 L 562,260 L 568,270 L 568,295 L 558,305 L 552,295 Z"/>
+          <!-- Middle East / Arabia -->
+          <path d="M 555,130 L 580,125 L 605,130 L 615,145 L 610,165 L 600,178 L 585,185 L 570,180 L 558,170 L 552,155 Z"/>
+          <!-- Russia / Central Asia -->
+          <path d="M 530,45 L 560,38 L 620,32 L 680,30 L 730,35 L 770,40 L 800,48 L 810,62 L 800,80 L 775,90 L 740,95 L 710,98 L 680,100 L 650,102 L 620,100 L 595,98 L 570,95 L 550,88 L 538,75 L 533,60 Z"/>
+          <!-- Asia (main) -->
+          <path d="M 595,98 L 640,102 L 680,100 L 720,105 L 760,108 L 790,115 L 810,125 L 815,145 L 808,162 L 795,175 L 778,185 L 760,192 L 740,195 L 718,195 L 698,190 L 680,182 L 665,172 L 650,160 L 638,148 L 625,138 L 610,128 L 598,118 Z"/>
+          <!-- Indian Subcontinent -->
+          <path d="M 638,148 L 660,142 L 680,145 L 698,155 L 708,168 L 710,185 L 705,205 L 695,222 L 678,235 L 662,240 L 648,235 L 636,220 L 628,205 L 625,188 L 626,170 L 630,158 Z"/>
+          <!-- Southeast Asia (peninsula) -->
+          <path d="M 735,175 L 752,170 L 762,178 L 762,192 L 755,210 L 742,218 L 732,215 L 726,202 L 728,188 Z"/>
+          <!-- China coast bump -->
+          <path d="M 765,130 L 790,120 L 808,130 L 812,150 L 805,165 L 790,170 L 775,165 L 765,152 Z"/>
+          <!-- Japan -->
+          <path d="M 830,115 L 845,108 L 855,115 L 858,130 L 848,140 L 835,140 L 826,130 Z"/>
+          <!-- Indonesia (simplified) -->
+          <path d="M 730,255 L 755,248 L 780,250 L 800,258 L 805,272 L 792,280 L 768,278 L 742,272 Z"/>
+          <path d="M 812,258 L 830,254 L 845,262 L 842,275 L 825,278 L 812,270 Z"/>
+          <!-- Australia -->
+          <path d="M 760,305 L 800,295 L 840,295 L 870,305 L 885,322 L 882,345 L 872,362 L 850,372 L 820,375 L 795,368 L 775,355 L 762,338 L 758,318 Z"/>
+          <!-- New Zealand -->
+          <path d="M 900,360 L 910,350 L 918,358 L 915,375 L 905,380 L 897,372 Z"/>
+        </g>
+
+        <!-- ── ANIMATED PING RINGS for active city ── -->
+        <g id="pingRings"></g>
+
+        <!-- ── OTHER WORLD CITIES (background markers) ── -->
+        <g id="bgMarkers" opacity="0.5">
+          <!-- London -->
+          <circle cx="460" cy="72" r="4" fill="#00c8ff" opacity="0.6"/>
+          <text x="466" y="76" font-size="8" fill="#00c8ff" font-family="JetBrains Mono,monospace">London</text>
+          <!-- Berlin -->
+          <circle cx="492" cy="68" r="3" fill="#00c8ff" opacity="0.5"/>
+          <!-- Shanghai -->
+          <circle cx="800" cy="148" r="4" fill="#ffb700" opacity="0.6"/>
+          <text x="806" y="152" font-size="8" fill="#ffb700" font-family="JetBrains Mono,monospace">Shanghai</text>
+          <!-- Beijing -->
+          <circle cx="782" cy="118" r="4" fill="#ffb700" opacity="0.5"/>
+          <text x="788" y="122" font-size="8" fill="#ffb700" font-family="JetBrains Mono,monospace">Beijing</text>
+          <!-- Sydney -->
+          <circle cx="848" cy="345" r="4" fill="#00ff9d" opacity="0.6"/>
+          <text x="854" y="349" font-size="8" fill="#00ff9d" font-family="JetBrains Mono,monospace">Sydney</text>
+          <!-- Dubai -->
+          <circle cx="590" cy="158" r="4" fill="#ffb700" opacity="0.5"/>
+          <text x="596" y="162" font-size="8" fill="#ffb700" font-family="JetBrains Mono,monospace">Dubai</text>
+          <!-- Lagos -->
+          <circle cx="462" cy="218" r="4" fill="#ff4a6b" opacity="0.6"/>
+          <text x="468" y="222" font-size="8" fill="#ff4a6b" font-family="JetBrains Mono,monospace">Lagos</text>
+          <!-- São Paulo -->
+          <circle cx="200" cy="330" r="4" fill="#ffb700" opacity="0.6"/>
+          <text x="206" y="334" font-size="8" fill="#ffb700" font-family="JetBrains Mono,monospace">São Paulo</text>
+          <!-- Mexico City -->
+          <circle cx="145" cy="195" r="4" fill="#ffb700" opacity="0.5"/>
+          <!-- Toronto -->
+          <circle cx="190" cy="115" r="4" fill="#00c8ff" opacity="0.5"/>
+        </g>
+
+        <!-- ── MAIN MONITORED CITIES (rendered via JS) ── -->
+        <g id="cityMarkers"></g>
+      </svg>
+
+      <!-- Overlay legend -->
+      <div class="map-overlay" style="top:12px;left:12px;">
+        <div class="map-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#ff4a6b"></div><span style="font-size:11px;color:var(--text)">Critical (80–100%)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ffb700"></div><span style="font-size:11px;color:var(--text)">High (50–79%)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#00c8ff"></div><span style="font-size:11px;color:var(--text)">Medium (25–49%)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#00ff9d"></div><span style="font-size:11px;color:var(--text)">Safe (0–24%)</span></div>
+        </div>
+      </div>
+      <!-- Top-right badge -->
+      <div style="position:absolute;top:12px;right:12px;background:rgba(5,10,15,0.85);backdrop-filter:blur(8px);border:1px solid rgba(0,200,255,0.15);border-radius:8px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);">
+        4 CITIES MONITORED
+      </div>
+      <!-- Zoom controls -->
+      <div class="map-controls">
+        <button class="map-ctrl-btn" onclick="mapZoom(1.3)" title="Zoom in">+</button>
+        <button class="map-ctrl-btn" onclick="mapZoom(0.77)" title="Zoom out">−</button>
+        <button class="map-ctrl-btn" onclick="mapReset()" title="Reset" style="font-size:12px;">⌂</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recommendations -->
+  <div class="panel span3">
+    <div class="panel-title">🏛 Government Recommendations — <span id="recInfraLabel" style="color:var(--accent)">Roads</span></div>
+    <div class="rec-list" id="recList"></div>
+  </div>
+
+</div>
+
+<!-- ACTIONS -->
+<div class="actions-bar">
+  <button class="btn-primary" onclick="generatePDF()">📄 Download Health Report</button>
+  <button class="btn-outline" onclick="showSection('analysis')">📈 Full Analysis</button>
+  <div class="carbon-badge">🌱 Carbon delay cost: <strong id="carbonCost">₹2.4Cr/yr</strong></div>
+</div>
+
+</div><!-- /section-dashboard -->
+
+<!-- ═══ ANALYSIS ═══ -->
+<div id="section-analysis" style="display:none;">
+<div class="dashboard">
+
+  <!-- Traffic Chart -->
+  <div class="panel span2">
+    <div class="panel-title">🚗 Traffic Load Trend (5 Years)</div>
+    <div class="chart-wrap"><canvas id="trafficChart"></canvas></div>
+  </div>
+
+  <!-- AQI Chart -->
+  <div class="panel">
+    <div class="panel-title">💨 AQI Monthly Trend</div>
+    <div class="chart-wrap"><canvas id="aqiChart"></canvas></div>
+  </div>
+
+  <!-- Flood History -->
+  <div class="panel">
+    <div class="panel-title">🌊 Flood Frequency History</div>
+    <div class="chart-wrap"><canvas id="floodChart"></canvas></div>
+  </div>
+
+  <!-- Structural Decay Projection -->
+  <div class="panel span2">
+    <div class="panel-title">📉 Structural Integrity Decay Projection</div>
+    <div class="chart-wrap"><canvas id="decayChart"></canvas></div>
+  </div>
+
+  <!-- Detailed Risk Breakdown -->
+  <div class="panel">
+    <div class="panel-title">📊 Risk Factor Breakdown</div>
+    <div id="riskBreakdown" style="display:flex;flex-direction:column;gap:10px;padding-top:4px;"></div>
+  </div>
+
+  <!-- SHAP Explainability -->
+  <div class="panel span2">
+    <div class="panel-title">🧠 Explainable AI – Feature Importance (SHAP)</div>
+    <div id="shapBars"></div>
+  </div>
+
+  <!-- City Infrastructure Stats -->
+  <div class="panel">
+    <div class="panel-title">🏙️ City Infrastructure Stats</div>
+    <div id="cityStats" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+
+  <!-- Environmental Impact -->
+  <div class="panel span3" style="background:var(--panel2);">
+    <div class="panel-title">🌍 Environmental & Health Impact Analysis</div>
+    <div id="envImpact" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;"></div>
+  </div>
+
+  <!-- Repair Cost Table -->
+  <div class="panel span3">
+    <div class="panel-title">💰 Preventive Cost Estimation & Priority Ranking</div>
+    <table class="cost-table" id="costTable"></table>
+  </div>
+
+  <!-- Comparative Analysis -->
+  <div class="panel span3">
+    <div class="panel-title">🆚 Comparative Risk Analysis – All Cities</div>
+    <div class="chart-wrap" style="height:180px;"><canvas id="compareChart"></canvas></div>
+  </div>
+
+</div>
+</div><!-- /section-analysis -->
+
+<!-- ═══ IMAGE UPLOAD ═══ -->
+<div id="section-upload" style="display:none;">
+<div class="dashboard">
+
+  <div class="panel span2">
+    <div class="panel-title">📷 Infrastructure Image Scan – AI Damage Detection</div>
+    
+    <!-- Detection type banner -->
+    <div id="detectionBanner" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;"></div>
+
+    <!-- Multi-image gallery -->
+    <div id="imageGallery" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"></div>
+
+    <!-- Upload zone -->
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" ondragover="handleDrag(event)" ondrop="handleDrop(event)">
+      <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFile(event)" />
+      <div id="uploadPrompt">
+        <div class="upload-icon">📸</div>
+        <div class="upload-label">Drop infrastructure images here</div>
+        <div class="upload-sub">Roads · Bridges · Pipelines · Buildings · Manholes · PNG, JPG</div>
+        <div style="margin-top:10px;font-family:var(--font-mono);font-size:10px;color:var(--muted);padding:6px 12px;background:rgba(0,200,255,0.05);border-radius:6px;display:inline-block;">AI will auto-detect infrastructure type</div>
+      </div>
+      <canvas id="damageCanvas" style="display:none;width:100%;border-radius:10px;max-height:240px;object-fit:cover;"></canvas>
+    </div>
+
+    <!-- Error banner -->
+    <div id="errorBanner" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,74,107,0.12);border:1px solid rgba(255,74,107,0.3);border-radius:8px;color:var(--accent2);font-size:13px;"></div>
+
+    <div class="damage-results" id="damageResults">
+      <div style="font-family:var(--font-head);font-size:20px;font-weight:700;color:#fff;margin-bottom:4px;">🔍 Damage Analysis Results</div>
+      <div id="dr-infra-type" style="font-family:var(--font-mono);font-size:11px;color:var(--accent);margin-bottom:14px;letter-spacing:1px;"></div>
+      <div class="damage-score"><span>Surface Crack Severity</span><span id="dr-crack" style="color:var(--accent2)">—</span></div>
+      <div class="damage-score"><span>Pothole / Cavity Detection</span><span id="dr-pothole" style="color:var(--warn)">—</span></div>
+      <div class="damage-score"><span>Surface Wear Score</span><span id="dr-wear" style="color:var(--accent)">—</span></div>
+      <div class="damage-score"><span>Water / Corrosion Damage</span><span id="dr-water" style="color:var(--accent3)">—</span></div>
+      <div class="damage-score"><span>Structural Deformation</span><span id="dr-deform" style="color:var(--warn)">—</span></div>
+      <div class="damage-score" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">
+        <span style="font-weight:600">Overall Damage Score</span><span id="dr-overall" style="color:#fff;font-size:18px">—</span>
+      </div>
+      <div style="margin-top:12px;padding:12px;background:rgba(255,74,107,0.08);border-radius:8px;border:1px solid rgba(255,74,107,0.2);font-size:12px;color:var(--text)" id="dr-recommendation"></div>
+      <button onclick="resetUpload()" style="margin-top:12px;padding:8px 16px;background:rgba(0,200,255,0.1);border:1px solid var(--accent);border-radius:6px;color:var(--accent);cursor:pointer;font-family:var(--font-body);font-size:12px;">+ Add Another Image</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">📝 Supported Infrastructure Types</div>
+    <div style="font-size:13px;color:var(--text);line-height:1.8;">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="padding:10px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);">🛣️ <strong>Roads & Highways</strong> – Cracks, potholes, surface wear</div>
+        <div style="padding:10px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);">🌉 <strong>Bridges & Flyovers</strong> – Structural deformation, corrosion</div>
+        <div style="padding:10px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);">🔧 <strong>Pipelines</strong> – Leaks, rust, joint failure indicators</div>
+        <div style="padding:10px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);">🏗️ <strong>Buildings</strong> – Wall cracks, foundation damage</div>
+        <div style="padding:10px;background:var(--panel2);border-radius:8px;border:1px solid var(--border);">🕳️ <strong>Manholes</strong> – Cover damage, subsidence detection</div>
+      </div>
+      <div style="margin-top:16px;padding:12px;background:rgba(255,74,107,0.06);border-radius:8px;border:1px solid rgba(255,74,107,0.15);font-size:12px;color:var(--muted);">
+        ⚠️ Images of non-infrastructure subjects (people, food, animals, etc.) will be rejected automatically.
+      </div>
+      <div style="margin-top:10px;padding:12px;background:rgba(0,200,255,0.06);border-radius:8px;border:1px solid rgba(0,200,255,0.15);font-size:12px;color:var(--muted);">
+        ℹ️ Damage score feeds into the main risk model as <strong>image_damage_score</strong>, improving accuracy by up to 15%.
+      </div>
+    </div>
+  </div>
+
+  <div class="panel span3">
+    <div class="panel-title">🤖 Model Architecture – AI Pipeline</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;">
+      <div style="text-align:center;padding:16px;background:var(--panel2);border-radius:10px;border:1px solid var(--border);">
+        <div style="font-size:28px;margin-bottom:8px;">📸</div>
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px;">Image Upload</div>
+        <div style="font-size:11px;color:var(--muted)">Multi-image support<br/>PNG, JPG, WebP<br/>Max 10MB/image</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:var(--panel2);border-radius:10px;border:1px solid var(--border);">
+        <div style="font-size:28px;margin-bottom:8px;">🔎</div>
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px;">Auto-Classification</div>
+        <div style="font-size:11px;color:var(--muted)">ResNet-based<br/>Type detection<br/>Rejection filter</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:var(--panel2);border-radius:10px;border:1px solid var(--border);">
+        <div style="font-size:28px;margin-bottom:8px;">⚙️</div>
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px;">Preprocessing</div>
+        <div style="font-size:11px;color:var(--muted)">Segmentation<br/>Edge detection<br/>Heatmap gen</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:var(--panel2);border-radius:10px;border:1px solid var(--border);">
+        <div style="font-size:28px;margin-bottom:8px;">🧠</div>
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px;">CNN Analysis</div>
+        <div style="font-size:11px;color:var(--muted)">5-channel damage<br/>scoring per<br/>infrastructure type</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:var(--panel2);border-radius:10px;border:1px solid var(--border);">
+        <div style="font-size:28px;margin-bottom:8px;">📊</div>
+        <div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:4px;">Risk Integration</div>
+        <div style="font-size:11px;color:var(--muted)">Merged into<br/>XGBoost ensemble<br/>+15% accuracy</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div><!-- /section-upload -->
+
+<!-- ═══ ALERTS ═══ -->
+<div id="section-alerts" style="display:none;">
+<div class="dashboard">
+
+  <div class="panel span2">
+    <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>🔔 Real-Time Infrastructure Alerts — <span id="alertCityLabel" style="color:var(--accent)">Mumbai</span></span>
+      <div style="display:flex;gap:6px;">
+        <button class="alert-filter-btn active" onclick="setAlertFilter('all', this)" style="padding:4px 10px;border-radius:5px;font-size:10px;font-family:var(--font-mono);background:rgba(0,200,255,0.1);border:1px solid rgba(0,200,255,0.3);color:var(--accent);cursor:pointer;">ALL</button>
+        <button class="alert-filter-btn" onclick="setAlertFilter('CRITICAL', this)" style="padding:4px 10px;border-radius:5px;font-size:10px;font-family:var(--font-mono);background:transparent;border:1px solid rgba(255,74,107,0.3);color:var(--accent2);cursor:pointer;">CRITICAL</button>
+        <button class="alert-filter-btn" onclick="setAlertFilter('HIGH', this)" style="padding:4px 10px;border-radius:5px;font-size:10px;font-family:var(--font-mono);background:transparent;border:1px solid rgba(255,183,0,0.3);color:var(--warn);cursor:pointer;">HIGH</button>
+        <button class="alert-filter-btn" onclick="setAlertFilter('INFO', this)" style="padding:4px 10px;border-radius:5px;font-size:10px;font-family:var(--font-mono);background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;">INFO</button>
+      </div>
+    </div>
+    <div class="alert-list" id="alertList"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">📈 Alert Statistics</div>
+    <div class="chart-wrap"><canvas id="alertChart"></canvas></div>
+    <div id="alertSummary" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;"></div>
+  </div>
+
+  <div class="panel span3">
+    <div class="panel-title">🌍 Data Sources Status</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;" id="sourceStatus"></div>
+  </div>
+
+</div>
+</div><!-- /section-alerts -->
+
+<script>
+// ════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════
+const CITIES = {
+  mumbai: {
+    name: 'Mumbai, India',
+    risk: 87, time: 2.1, level: 'HIGH',
+    traffic: 94000, aqi: 178, flood: 14, heavy: 38,
+    rainfall: 2400, age: 32, material: 'Asphalt',
+    carbonCost: '₹2.4Cr/yr',
+    failETA: 'March 2027',
+    warnETA: 'Sep 2026',
+    trafficData: [52,58,65,71,78,82,88,94],
+    aqiData: [120,145,160,155,170,165,180,178],
+    floodData: [2,1,3,2,4,2,3,4],
+    coords: { x: 0.615, y: 0.48 },
+    color: '#ff4a6b',
+    recs: [
+      { icon: '🛣️', title: 'Road Widening – Western Express Hwy', desc: 'High traffic load (94K/day) with 38% heavy vehicles exceeds design capacity. Recommend 2-lane expansion.', priority: 'CRITICAL' },
+      { icon: '🌊', title: 'Improved Drainage Infrastructure', desc: '14 flood events in 5 years causing subsurface erosion. Install French drains and retention basins along vulnerable corridors.', priority: 'CRITICAL' },
+      { icon: '⚖️', title: 'Heavy Vehicle Weight Restriction', desc: 'Enforce 10-ton axle load limit on identified segments. Install weigh stations at 3 key entry points.', priority: 'HIGH' },
+      { icon: '🔬', title: 'Surface Reinforcement Program', desc: 'AQI 178 accelerates bitumen oxidation. Apply polymer-modified bitumen overlay on 45km priority routes.', priority: 'HIGH' },
+      { icon: '📡', title: 'IoT Sensor Deployment', desc: 'Install structural health monitoring sensors at 12 critical bridge joints for real-time vibration analysis.', priority: 'MEDIUM' },
+    ],
+    costs: [
+      { rank: 1, action: 'Emergency Drainage Repair', timeline: '3 months', cost: '₹45 Cr', savings: '₹240 Cr', priority: 'CRITICAL' },
+      { rank: 2, action: 'Road Surface Resurfacing', timeline: '6 months', cost: '₹120 Cr', savings: '₹680 Cr', priority: 'CRITICAL' },
+      { rank: 3, action: 'Bridge Structural Assessment', timeline: '2 months', cost: '₹8 Cr', savings: '₹300 Cr', priority: 'HIGH' },
+      { rank: 4, action: 'Traffic Sensor Network', timeline: '4 months', cost: '₹22 Cr', savings: '₹90 Cr', priority: 'HIGH' },
+      { rank: 5, action: 'Weight Restriction Enforcement', timeline: '1 month', cost: '₹5 Cr', savings: '₹60 Cr', priority: 'MEDIUM' },
+    ]
+  },
+  newyork: {
+    name: 'New York, USA',
+    risk: 62, time: 4.3, level: 'MEDIUM',
+    traffic: 142000, aqi: 68, flood: 6, heavy: 22,
+    rainfall: 1200, age: 58, material: 'Reinforced Concrete',
+    carbonCost: '$1.8M/yr',
+    failETA: 'June 2030',
+    warnETA: 'Jan 2029',
+    trafficData: [98,110,118,125,130,135,139,142],
+    aqiData: [55,60,65,62,70,68,65,68],
+    floodData: [1,0,2,1,1,2,0,1],
+    coords: { x: 0.27, y: 0.35 },
+    color: '#ffb700',
+    recs: [
+      { icon: '🌉', title: 'Bridge Aging Assessment Program', desc: 'Average infrastructure age 58 years. Deploy comprehensive structural assessment for 34 bridges above threshold.', priority: 'HIGH' },
+      { icon: '🚇', title: 'Underground Utility Mapping', desc: 'High subsurface congestion causes sinkholes. Commission 3D ground-penetrating radar survey across Manhattan.', priority: 'HIGH' },
+      { icon: '❄️', title: 'Winter Freeze-Thaw Mitigation', desc: 'Seasonal thermal cycling causes pavement cracking. Apply rubberized asphalt overlay on 120 miles of primary roads.', priority: 'MEDIUM' },
+      { icon: '💧', title: 'Storm Surge Protection', desc: 'Post-Sandy vulnerability. Upgrade culverts and install flood gates at 8 critical infrastructure intersections.', priority: 'MEDIUM' },
+    ],
+    costs: [
+      { rank: 1, action: 'Bridge Inspection Program', timeline: '6 months', cost: '$85M', savings: '$2.1B', priority: 'HIGH' },
+      { rank: 2, action: 'Pavement Resurfacing', timeline: '12 months', cost: '$340M', savings: '$1.4B', priority: 'HIGH' },
+      { rank: 3, action: 'Drainage Upgrade', timeline: '8 months', cost: '$120M', savings: '$560M', priority: 'MEDIUM' },
+      { rank: 4, action: 'Sensor Monitoring Network', timeline: '6 months', cost: '$45M', savings: '$200M', priority: 'MEDIUM' },
+      { rank: 5, action: 'Utility Line Mapping', timeline: '4 months', cost: '$28M', savings: '$150M', priority: 'MEDIUM' },
+    ]
+  },
+  pune: {
+    name: 'Pune, India',
+    risk: 74, time: 3.2, level: 'HIGH',
+    traffic: 68000, aqi: 155, flood: 9, heavy: 31,
+    rainfall: 1800, age: 27, material: 'Asphalt',
+    carbonCost: '₹1.6Cr/yr',
+    failETA: 'May 2029',
+    warnETA: 'Nov 2027',
+    trafficData: [38,44,50,56,59,62,65,68],
+    aqiData: [100,118,130,128,145,140,150,155],
+    floodData: [1,2,1,2,1,2,2,3],
+    coords: { x: 0.638, y: 0.468 },
+    color: '#ffb700',
+    recs: [
+      { icon: '🛣️', title: 'Ring Road Capacity Expansion', desc: 'Pune ring road handles 68K+ daily vehicles at 31% heavy vehicle ratio, significantly above design spec. Urgent 3rd lane addition needed.', priority: 'CRITICAL' },
+      { icon: '🌊', title: 'Mula-Mutha River Flood Barriers', desc: '9 flood events in 5 years. River overflow causes regular road subsidence. Install 12km of reinforced embankments.', priority: 'HIGH' },
+      { icon: '💨', title: 'AQI-Linked Surface Treatment', desc: 'AQI 155 (Unhealthy) accelerates asphalt oxidation and bitumen degradation. Apply high-viscosity sealant on 38km routes.', priority: 'HIGH' },
+      { icon: '🏗️', title: 'IT Corridor Bridge Inspection', desc: 'Hinjewadi Phase-3 and Wakad flyovers require immediate structural fatigue assessment due to rapid traffic growth.', priority: 'HIGH' },
+      { icon: '📡', title: 'Smart Road Sensor Network', desc: 'Deploy 280 piezoelectric sensors across PCMC-limit roads to monitor axle load in real-time.', priority: 'MEDIUM' },
+    ],
+    costs: [
+      { rank: 1, action: 'Emergency Pothole Repair Drive', timeline: '2 months', cost: '₹28 Cr', savings: '₹180 Cr', priority: 'CRITICAL' },
+      { rank: 2, action: 'Ring Road Expansion', timeline: '18 months', cost: '₹340 Cr', savings: '₹950 Cr', priority: 'CRITICAL' },
+      { rank: 3, action: 'Flood Embankment Works', timeline: '8 months', cost: '₹65 Cr', savings: '₹420 Cr', priority: 'HIGH' },
+      { rank: 4, action: 'Flyover Structural Audit', timeline: '3 months', cost: '₹12 Cr', savings: '₹280 Cr', priority: 'HIGH' },
+      { rank: 5, action: 'Sensor Monitoring Network', timeline: '5 months', cost: '₹18 Cr', savings: '₹75 Cr', priority: 'MEDIUM' },
+    ]
+  },
+  tokyo: {
+    name: 'Tokyo, Japan',
+    risk: 31, time: 7.8, level: 'LOW',
+    traffic: 198000, aqi: 42, flood: 3, heavy: 18,
+    rainfall: 1500, age: 18, material: 'High-Grade Concrete',
+    carbonCost: '¥890M/yr',
+    failETA: 'Oct 2033',
+    warnETA: 'Apr 2032',
+    trafficData: [150,160,165,172,180,188,194,198],
+    aqiData: [38,42,45,40,44,42,41,42],
+    floodData: [0,1,0,1,1,0,1,0],
+    coords: { x: 0.84, y: 0.38 },
+    color: '#00ff9d',
+    recs: [
+      { icon: '🏗️', title: 'Earthquake Resilience Upgrade', desc: 'Seismic risk classification requires retrofit of 12 highway overpasses to comply with 2024 standards.', priority: 'HIGH' },
+      { icon: '🔍', title: 'Preventive Maintenance Scheduling', desc: 'Low current risk but high traffic intensity (198K/day) accelerates micro-fatigue. Schedule 5-year deep maintenance cycle.', priority: 'MEDIUM' },
+      { icon: '🤖', title: 'AI Monitoring Integration', desc: 'Expand existing IoT sensor network from 340 to 1200 nodes for comprehensive structural health monitoring.', priority: 'MEDIUM' },
+    ],
+    costs: [
+      { rank: 1, action: 'Seismic Retrofit Program', timeline: '24 months', cost: '¥18.5B', savings: '¥240B', priority: 'HIGH' },
+      { rank: 2, action: 'Preventive Maintenance', timeline: '12 months', cost: '¥4.2B', savings: '¥38B', priority: 'MEDIUM' },
+      { rank: 3, action: 'Sensor Network Expansion', timeline: '8 months', cost: '¥1.8B', savings: '¥15B', priority: 'MEDIUM' },
+      { rank: 4, action: 'Surface Micro-Crack Sealing', timeline: '6 months', cost: '¥890M', savings: '¥8.4B', priority: 'MEDIUM' },
+      { rank: 5, action: 'Drainage Capacity Review', timeline: '3 months', cost: '¥240M', savings: '¥2.1B', priority: 'LOW' },
+    ]
+  }
+};
+
+const SHAP_FEATURES = [
+  { label: 'Traffic Load', pos: true },
+  { label: 'Flood Frequency', pos: true },
+  { label: 'AQI Level', pos: true },
+  { label: 'Heavy Vehicle Ratio', pos: true },
+  { label: 'Road Age', pos: true },
+  { label: 'Rainfall Trend', pos: true },
+  { label: 'Surface Material', pos: false },
+  { label: 'Drainage Quality', pos: false },
+  { label: 'Image Damage Score', pos: true },
+  { label: 'Soil Moisture', pos: true },
+];
+
+// Infra-type specific recommendations per city
+const INFRA_RECS = {
+  mumbai: {
+    roads: [
+      { icon: '🛣️', title: 'Road Widening – Western Express Hwy', desc: 'High traffic load (94K/day) with 38% heavy vehicles exceeds design capacity. Recommend 2-lane expansion.', priority: 'CRITICAL' },
+      { icon: '🌊', title: 'Improved Drainage Infrastructure', desc: '14 flood events in 5 years causing subsurface erosion. Install French drains and retention basins along vulnerable corridors.', priority: 'CRITICAL' },
+      { icon: '⚖️', title: 'Heavy Vehicle Weight Restriction', desc: 'Enforce 10-ton axle load limit on identified segments. Install weigh stations at 3 key entry points.', priority: 'HIGH' },
+      { icon: '🔬', title: 'Surface Reinforcement Program', desc: 'AQI 178 accelerates bitumen oxidation. Apply polymer-modified bitumen overlay on 45km priority routes.', priority: 'HIGH' },
+      { icon: '📡', title: 'IoT Sensor Deployment', desc: 'Install structural health monitoring sensors at 12 critical junctions for real-time vibration analysis.', priority: 'MEDIUM' },
+    ],
+    bridges: [
+      { icon: '🌉', title: 'Bandra-Worli Bridge Load Testing', desc: 'Exceeds designed load by 22% during peak hours. Emergency structural load audit required within 30 days.', priority: 'CRITICAL' },
+      { icon: '🔩', title: 'Steel Corrosion Treatment', desc: 'High AQI and coastal salt exposure causing rapid corrosion on Mahim Causeway. Apply epoxy anti-corrosion coating.', priority: 'CRITICAL' },
+      { icon: '📐', title: 'Deck Expansion Joint Inspection', desc: 'Thermal cycling and heavy vehicle impact causing expansion joint failure on 8 flyovers. Replace with modular joints.', priority: 'HIGH' },
+      { icon: '💧', title: 'Bridge Drainage System Upgrade', desc: '14 flood events blocking bridge drainage channels. Install self-cleaning outlets and raise parapets by 400mm.', priority: 'HIGH' },
+      { icon: '📡', title: 'Structural Health Monitoring', desc: 'Deploy accelerometer and strain gauge network on 5 critical bridges for real-time failure prediction.', priority: 'MEDIUM' },
+    ],
+    pipelines: [
+      { icon: '🔧', title: 'Water Main Pressure Relief', desc: 'Ageing cast iron mains under high traffic zones showing 31% failure rate. Replace 12km with ductile iron piping.', priority: 'CRITICAL' },
+      { icon: '🌊', title: 'Flood-Proof Pipeline Casing', desc: 'Repeated waterlogging causes pipeline joint failure in Kurla and Dharavi. Install HDPE casing on 8km vulnerable segments.', priority: 'CRITICAL' },
+      { icon: '🔍', title: 'CCTV Pipeline Inspection', desc: 'Schedule camera inspection of 45km of primary water mains in Andheri–Borivali corridor.', priority: 'HIGH' },
+      { icon: '💨', title: 'Gas Pipeline Integrity Survey', desc: 'AQI 178 and flooding risk requires annual leak survey on MNGL gas distribution network.', priority: 'HIGH' },
+      { icon: '📡', title: 'Smart Leak Detection Sensors', desc: 'Install acoustic leak detection on 20 high-risk pipeline segments to prevent road collapses.', priority: 'MEDIUM' },
+    ]
+  },
+  pune: {
+    roads: [
+      { icon: '🛣️', title: 'Ring Road Capacity Expansion', desc: 'Pune ring road handles 68K+ daily vehicles at 31% heavy vehicle ratio, significantly above design spec. Urgent 3rd lane addition needed.', priority: 'CRITICAL' },
+      { icon: '🌊', title: 'Mula-Mutha River Flood Barriers', desc: '9 flood events in 5 years. River overflow causes regular road subsidence. Install 12km of reinforced embankments.', priority: 'HIGH' },
+      { icon: '💨', title: 'AQI-Linked Surface Treatment', desc: 'AQI 155 (Unhealthy) accelerates asphalt oxidation and bitumen degradation. Apply high-viscosity sealant on 38km routes.', priority: 'HIGH' },
+      { icon: '🏗️', title: 'IT Corridor Bridge Inspection', desc: 'Hinjewadi Phase-3 and Wakad flyovers require immediate structural fatigue assessment due to rapid traffic growth.', priority: 'HIGH' },
+      { icon: '📡', title: 'Smart Road Sensor Network', desc: 'Deploy 280 piezoelectric sensors across PCMC-limit roads to monitor axle load in real-time.', priority: 'MEDIUM' },
+    ],
+    bridges: [
+      { icon: '🌉', title: 'Sangam Bridge Emergency Assessment', desc: 'Sangam bridge (Panchgani highway) shows foundation erosion after 9 flood events. Load testing mandatory immediately.', priority: 'CRITICAL' },
+      { icon: '🏗️', title: 'Katraj Flyover Fatigue Analysis', desc: 'IT corridor flyovers designed for 45K vehicles but now handling 68K+. Structural fatigue analysis overdue.', priority: 'CRITICAL' },
+      { icon: '🔩', title: 'Pre-stressed Cable Inspection', desc: 'Cable-stayed bridges on Mumbai–Pune Expressway require bi-annual cable tension monitoring and anti-corrosion treatment.', priority: 'HIGH' },
+      { icon: '💧', title: 'Flood-Resistant Foundation Retrofit', desc: 'Mula-Mutha river flood risk demands scour protection and foundation deepening on 4 bridges.', priority: 'HIGH' },
+      { icon: '📡', title: 'Real-time Vibration Monitoring', desc: 'Install seismic and traffic vibration sensors on 8 critical bridges in Hinjewadi–Wakad corridor.', priority: 'MEDIUM' },
+    ],
+    pipelines: [
+      { icon: '🔧', title: 'Old City Pipeline Replacement', desc: '40+ year old CI pipelines in Shivajinagar-Deccan area showing 28% failure rate. Replace 15km urgently.', priority: 'CRITICAL' },
+      { icon: '🌊', title: 'Flood-Proof Underground Ducts', desc: 'Flood events repeatedly damage underground ducts in Kothrud and Hadapsar. Install waterproof conduit systems.', priority: 'HIGH' },
+      { icon: '🔍', title: 'IT Park Utility Mapping', desc: 'Hinjewadi IT park lacks comprehensive utility map. Commission 3D underground survey to prevent construction conflicts.', priority: 'HIGH' },
+      { icon: '💨', title: 'PMC Water Main Pressure Audit', desc: 'PMC reports 35% non-revenue water loss. Pressure zone management and leak survey required across 180km network.', priority: 'HIGH' },
+      { icon: '📡', title: 'Smart Meter Network', desc: 'Deploy IoT water meters and pressure loggers on primary distribution mains for real-time NRW reduction.', priority: 'MEDIUM' },
+    ]
+  },
+  newyork: {
+    roads: [
+      { icon: '❄️', title: 'Freeze-Thaw Pavement Mitigation', desc: 'Seasonal thermal cycling causes pavement cracking on 120 miles of primary roads. Apply rubberized asphalt overlay.', priority: 'HIGH' },
+      { icon: '🔧', title: 'Underground Utility Mapping', desc: 'High subsurface congestion causes sinkholes. Commission 3D ground-penetrating radar survey across Manhattan.', priority: 'HIGH' },
+      { icon: '💧', title: 'Storm Surge Road Protection', desc: 'Post-Sandy vulnerability. Upgrade culverts and install flood gates at 8 critical infrastructure intersections.', priority: 'MEDIUM' },
+      { icon: '🏗️', title: 'Road Bed Stabilization', desc: 'Aging road beds on FDR Drive and West Side Hwy require deep stabilization to support increasing truck traffic.', priority: 'MEDIUM' },
+      { icon: '📡', title: 'Smart Traffic Sensor Grid', desc: 'Expand NYC DOT sensor network with 450 additional pressure and vibration sensors on high-load corridors.', priority: 'MEDIUM' },
+    ],
+    bridges: [
+      { icon: '🌉', title: 'Bridge Aging Assessment Program', desc: 'Average infrastructure age 58 years. Deploy comprehensive structural assessment for 34 bridges above threshold.', priority: 'HIGH' },
+      { icon: '🔩', title: 'Suspension Cable Replacement', desc: 'Brooklyn Bridge and Williamsburg Bridge cable aging requires 10-year replacement cycle. Begin Phase 1 planning.', priority: 'HIGH' },
+      { icon: '💧', title: 'Salt Exposure Corrosion Treatment', desc: 'Marine environment accelerates corrosion. Apply sacrificial anode cathodic protection on 12 East River bridges.', priority: 'MEDIUM' },
+      { icon: '🛡️', title: 'Seismic Retrofit Program', desc: 'Post-2001 seismic risk assessment mandates retrofit of 8 bridges to current IBC standards by 2028.', priority: 'MEDIUM' },
+      { icon: '📡', title: 'Structural Health Monitoring', desc: 'Deploy fiber-optic SHM systems on 5 major bridges for continuous load and fatigue monitoring.', priority: 'MEDIUM' },
+    ],
+    pipelines: [
+      { icon: '🔧', title: 'Century-Old Water Main Replacement', desc: 'DEP reports 100+ year old cast iron mains in Manhattan. Replace 25km of highest-risk segments.', priority: 'HIGH' },
+      { icon: '💧', title: 'Storm Surge Pipeline Protection', desc: 'Hurricane Sandy exposed vulnerability of lower Manhattan utilities. Install surge barriers on 15 critical utility vaults.', priority: 'HIGH' },
+      { icon: '🔍', title: 'Steam System Inspection', desc: 'Con Edison steam pipes under Midtown require bi-annual inspection after 2007 Lexington Ave incident.', priority: 'MEDIUM' },
+      { icon: '❄️', title: 'Freeze-Proof Insulation', desc: 'Exposed above-ground pipes in bridges and structures require upgraded thermal insulation for climate extremes.', priority: 'MEDIUM' },
+      { icon: '📡', title: 'Smart Pressure Monitoring', desc: 'Deploy 800 wireless pressure transducers on water distribution network to detect leaks within 30 minutes.', priority: 'MEDIUM' },
+    ]
+  },
+  tokyo: {
+    roads: [
+      { icon: '🏗️', title: 'Earthquake Resilience Upgrade', desc: 'Seismic risk classification requires retrofit of 12 highway overpasses to comply with 2024 standards.', priority: 'HIGH' },
+      { icon: '🔍', title: 'Preventive Maintenance Scheduling', desc: 'Low current risk but high traffic intensity (198K/day) accelerates micro-fatigue. Schedule 5-year deep maintenance cycle.', priority: 'MEDIUM' },
+      { icon: '🤖', title: 'AI Monitoring Integration', desc: 'Expand existing IoT sensor network from 340 to 1200 nodes for comprehensive structural health monitoring.', priority: 'MEDIUM' },
+      { icon: '💧', title: 'Typhoon Drainage Capacity', desc: 'Annual typhoon season requires 30% drainage capacity increase on Kan-Nana Dori and Kanpachi Dori corridors.', priority: 'MEDIUM' },
+    ],
+    bridges: [
+      { icon: '🏗️', title: 'Seismic Isolation Upgrade', desc: 'Post-2011 Tohoku standards mandate seismic isolation bearings on all highway bridges above 50m span.', priority: 'HIGH' },
+      { icon: '🔩', title: 'Steel Fatigue Inspection', desc: 'High-traffic bridges (>150K/day) require annual fatigue crack inspection using ultrasonic testing methods.', priority: 'MEDIUM' },
+      { icon: '🌊', title: 'Tsunami Barrier Integration', desc: 'Bridges in coastal zones require integration with Tokyo Bay flood protection barrier systems.', priority: 'MEDIUM' },
+      { icon: '📡', title: 'Fiber Optic SHM Network', desc: 'Extend fiber optic structural health monitoring from 45 to 120 bridges for complete network coverage.', priority: 'MEDIUM' },
+    ],
+    pipelines: [
+      { icon: '🏗️', title: 'Seismic-Resistant Joint Upgrade', desc: 'Flexible earthquake-resistant joints required on all water mains crossing active fault lines in Tokyo Bay area.', priority: 'HIGH' },
+      { icon: '🔧', title: 'Aging Pipe Replacement Program', desc: 'TMG Waterworks Bureau targets replacement of 400km of pre-1980 pipes by 2030. Accelerate Phase 2 by 2027.', priority: 'MEDIUM' },
+      { icon: '💧', title: 'Smart Valve Network', desc: 'Install 500 remotely-operable emergency shutoff valves for rapid isolation during seismic events.', priority: 'MEDIUM' },
+      { icon: '📡', title: 'Hydrogen Pipeline Pilot', desc: 'Tokyo 2040 hydrogen city plan requires infrastructure assessment for fuel cell vehicle supply chain integration.', priority: 'MEDIUM' },
+    ]
+  }
+};
+
+// Infra type risk tweaks and search index
+const INFRA_TWEAKS = { roads: 0, bridges: 5, pipelines: -8 };
+const INFRA_LABELS = { roads: 'Roads', bridges: 'Bridges', pipelines: 'Pipelines' };
+
+// Search index of known roads/bridges/infrastructure
+const SEARCH_INDEX = [
+  // Mumbai
+  { name: 'Western Express Highway', city: 'mumbai', infra: 'roads', risk: 89, desc: 'High-volume arterial road, 94K daily traffic' },
+  { name: 'Bandra-Worli Sea Link', city: 'mumbai', infra: 'bridges', risk: 82, desc: 'Toll bridge, fatigue risk from sustained heavy load' },
+  { name: 'Eastern Express Highway', city: 'mumbai', infra: 'roads', risk: 85, desc: 'Port connectivity road, high heavy vehicle ratio' },
+  { name: 'Mahim Causeway', city: 'mumbai', infra: 'bridges', risk: 91, desc: 'Colonial-era bridge, significant structural degradation' },
+  { name: 'Mumbai Water Mains Kurla', city: 'mumbai', infra: 'pipelines', risk: 78, desc: 'Aging cast iron, flood-prone corridor' },
+  { name: 'LBS Marg', city: 'mumbai', infra: 'roads', risk: 80, desc: 'Suburb connector, recurring pothole formation' },
+  // Pune
+  { name: 'Pune Ring Road', city: 'pune', infra: 'roads', risk: 76, desc: 'IT corridor connector, exceeds design load' },
+  { name: 'Katraj Flyover', city: 'pune', infra: 'bridges', risk: 72, desc: 'IT corridor bridge, traffic growth stress' },
+  { name: 'Sangam Bridge Panchgani', city: 'pune', infra: 'bridges', risk: 79, desc: 'Rural bridge, flood erosion risk' },
+  { name: 'PMC Water Main Shivajinagar', city: 'pune', infra: 'pipelines', risk: 71, desc: '40+ year old pipes, replacement urgent' },
+  { name: 'Hinjewadi Expressway', city: 'pune', infra: 'roads', risk: 69, desc: 'IT hub connector, rapid deterioration' },
+  // New York
+  { name: 'Brooklyn Bridge', city: 'newyork', infra: 'bridges', risk: 65, desc: '140-year-old suspension bridge, cable aging' },
+  { name: 'FDR Drive', city: 'newyork', infra: 'roads', risk: 63, desc: 'Coastal highway, salt exposure and aging road bed' },
+  { name: 'Williamsburg Bridge', city: 'newyork', infra: 'bridges', risk: 68, desc: 'East River crossing, steel fatigue monitoring needed' },
+  { name: 'West Side Highway', city: 'newyork', infra: 'roads', risk: 58, desc: 'Waterfront arterial, post-Sandy vulnerability' },
+  { name: 'Manhattan Water Main', city: 'newyork', infra: 'pipelines', risk: 70, desc: 'Century-old cast iron, high rupture risk' },
+  { name: 'Queens Midtown Tunnel', city: 'newyork', infra: 'bridges', risk: 55, desc: 'Subsea tunnel, corrosion monitoring active' },
+  // Tokyo
+  { name: 'Shuto Expressway', city: 'tokyo', infra: 'roads', risk: 34, desc: 'High maintenance standards, seismic-ready' },
+  { name: 'Rainbow Bridge Tokyo', city: 'tokyo', infra: 'bridges', risk: 28, desc: 'Modern suspension bridge, low risk' },
+  { name: 'Kan-Nana Dori', city: 'tokyo', infra: 'roads', risk: 38, desc: 'Ring road, typhoon drainage concern' },
+  { name: 'Tokyo Bay Water Supply', city: 'tokyo', infra: 'pipelines', risk: 25, desc: 'Modern seismic-resistant infrastructure' },
+  { name: ' Tokyo Gate Bridge', city: 'tokyo', infra: 'bridges', risk: 22, desc: 'Recent construction, excellent condition' },
+];
+
+let currentCity = 'mumbai';
+let currentInfra = 'roads';
+let charts = {};
+let alertInterval;
+let alertSeverityFilter = 'all';
+let mapZoomLevel = 1;
+let mapPanX = 0, mapPanY = 0;
+let mapIsPanning = false;
+let mapLastX = 0, mapLastY = 0;
+let uploadedImages = []; // multi-image store
+let activeImageIndex = -1;
+
+// ════════════════════════════════════════
+// SECTION ROUTING
+// ════════════════════════════════════════
+function showSection(id) {
+  ['dashboard','analysis','upload','alerts'].forEach(s => {
+    document.getElementById('section-' + s).style.display = 'none';
+  });
+  document.getElementById('section-' + id).style.display = 'block';
+  document.querySelectorAll('.nav-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['dashboard','analysis','upload','alerts'][i] === id);
+  });
+  if (id === 'analysis') initAnalysisCharts();
+  if (id === 'alerts') initAlerts();
+}
+
+// ════════════════════════════════════════
+// CITY & INFRA SELECTION
+// ════════════════════════════════════════
+function selectCity(city, btn) {
+  currentCity = city;
+  document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateDashboard();
+  if (document.getElementById('section-analysis').style.display !== 'none') initAnalysisCharts();
+  if (document.getElementById('section-alerts').style.display !== 'none') initAlerts();
+}
+
+function selectInfra(infra, btn) {
+  currentInfra = infra;
+  document.querySelectorAll('.infra-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const tweaked = Math.min(99, Math.max(5, CITIES[currentCity].risk + INFRA_TWEAKS[infra]));
+  animateGauge(tweaked);
+  renderRecs();
+  const lbl = document.getElementById('recInfraLabel');
+  if (lbl) lbl.textContent = INFRA_LABELS[infra];
+}
+
+function updateDashboard() {
+  const d = CITIES[currentCity];
+  animateGauge(d.risk);
+  const badge = document.getElementById('riskBadge');
+  badge.className = 'risk-badge risk-' + d.level;
+  badge.textContent = d.level === 'HIGH' ? '⚠ HIGH RISK' : d.level === 'MEDIUM' ? '▲ MEDIUM RISK' : '✓ LOW RISK';
+  document.getElementById('m-traffic').textContent = (d.traffic/1000).toFixed(0) + 'K';
+  document.getElementById('b-traffic').style.width = Math.min(100, d.traffic/2000) + '%';
+  document.getElementById('m-aqi').textContent = d.aqi;
+  document.getElementById('b-aqi').style.width = Math.min(100, d.aqi/3) + '%';
+  document.getElementById('m-flood').textContent = d.flood;
+  document.getElementById('b-flood').style.width = Math.min(100, d.flood*7) + '%';
+  document.getElementById('m-heavy').textContent = d.heavy + '%';
+  document.getElementById('b-heavy').style.width = d.heavy + '%';
+  document.getElementById('failureTime').textContent = d.time;
+  document.getElementById('failureDate').textContent = 'ETA: ' + d.failETA;
+  document.getElementById('t-now').textContent = 'Feb 2026';
+  document.getElementById('t-warn').textContent = d.warnETA;
+  document.getElementById('t-fail').textContent = d.failETA;
+  document.getElementById('carbonCost').textContent = d.carbonCost;
+  renderRecs();
+  drawMap();
+  const lbl = document.getElementById('recInfraLabel');
+  if (lbl) lbl.textContent = INFRA_LABELS[currentInfra];
+}
+
+function animateGauge(pct) {
+  document.getElementById('riskNum').textContent = pct + '%';
+  const fill = document.getElementById('gaugeFill');
+  const totalLen = 251.2;
+  const offset = totalLen - (pct / 100) * totalLen;
+  fill.style.strokeDashoffset = offset;
+  const angle = -90 + (pct / 100) * 180;
+  document.getElementById('gaugeNeedle').setAttribute('transform', `rotate(${angle}, 100, 110)`);
+}
+
+// ════════════════════════════════════════
+// SEARCH
+// ════════════════════════════════════════
+function handleSearch(q) {
+  const sug = document.getElementById('searchSuggestions');
+  if (!q || q.length < 2) { sug.innerHTML = ''; return; }
+  const results = SEARCH_INDEX.filter(i => i.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
+  sug.innerHTML = results.length ? results.map(r => `
+    <div onclick="applySearch(${JSON.stringify(r).replace(/"/g, '&quot;')})" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(0,200,255,0.06)'" onmouseout="this.style.background='none'">
+      <div>
+        <div style="font-size:13px;color:#fff;">${r.name}</div>
+        <div style="font-size:11px;color:var(--muted);">${CITIES[r.city].name} · ${INFRA_LABELS[r.infra]}</div>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:12px;color:${r.risk>75?'#ff4a6b':r.risk>50?'#ffb700':'#00ff9d'}">${r.risk}%</div>
+    </div>
+  `).join('') : `<div style="padding:12px 14px;color:var(--muted);font-size:13px;">No results found</div>`;
+}
+
+function applySearch(r) {
+  document.getElementById('infraSearch').value = r.name;
+  document.getElementById('searchSuggestions').style.display = 'none';
+  // Switch city
+  const btn = [...document.querySelectorAll('.city-btn')].find(b => b.textContent.includes(CITIES[r.city].name.split(',')[0]));
+  if (btn) { currentCity = r.city; document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+  // Switch infra
+  const iBtn = [...document.querySelectorAll('.infra-tab')].find(b => b.textContent.toLowerCase().includes(r.infra.replace('s','')));
+  if (iBtn) { currentInfra = r.infra; document.querySelectorAll('.infra-tab').forEach(b => b.classList.remove('active')); iBtn.classList.add('active'); }
+  updateDashboard();
+  animateGauge(r.risk);
+  const res = document.getElementById('searchResult');
+  const resText = document.getElementById('searchResultText');
+  res.style.display = 'flex';
+  resText.innerHTML = `🔍 Showing: <strong style="color:#fff;margin-left:6px;">${r.name}</strong> &nbsp;·&nbsp; ${CITIES[r.city].name} &nbsp;·&nbsp; Risk: <span style="color:${r.risk>75?'#ff4a6b':r.risk>50?'#ffb700':'#00ff9d'};font-weight:700">${r.risk}%</span>`;
+  // Update recs for this infra type
+  renderRecs();
+}
+
+function clearSearch() {
+  document.getElementById('infraSearch').value = '';
+  document.getElementById('searchResult').style.display = 'none';
+}
+
+// ════════════════════════════════════════
+// RECOMMENDATIONS
+// ════════════════════════════════════════
+function renderRecs() {
+  const recs = (INFRA_RECS[currentCity] && INFRA_RECS[currentCity][currentInfra]) || CITIES[currentCity].recs;
+  const list = document.getElementById('recList');
+  list.innerHTML = recs.map(r => `
+    <div class="rec-item">
+      <div class="rec-icon" style="background:rgba(0,200,255,0.08)">${r.icon}</div>
+      <div class="rec-body">
+        <div class="rec-title">${r.title}</div>
+        <div class="rec-desc">${r.desc}</div>
+      </div>
+      <div class="rec-priority priority-${r.priority}">${r.priority}</div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════
+// SVG MAP RENDERING + ZOOM/PAN
+// ════════════════════════════════════════
+const CITY_SVG = {
+  mumbai:  { x: 648, y: 178, label: 'Mumbai' },
+  pune:    { x: 644, y: 185, label: 'Pune' },
+  newyork: { x: 195, y: 122, label: 'New York' },
+  tokyo:   { x: 840, y: 132, label: 'Tokyo' },
+};
+
+function mapZoom(factor) {
+  mapZoomLevel = Math.min(6, Math.max(0.7, mapZoomLevel * factor));
+  applyMapTransform();
+}
+function mapReset() {
+  mapZoomLevel = 1; mapPanX = 0; mapPanY = 0;
+  applyMapTransform();
+}
+function applyMapTransform() {
+  const svg = document.getElementById('worldMapSVG');
+  if (!svg) return;
+  svg.style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapZoomLevel})`;
+  svg.style.transformOrigin = 'center center';
+}
+
+function initMapPan() {
+  const container = document.querySelector('.map-container');
+  if (!container || container._panInit) return;
+  container._panInit = true;
+  container.addEventListener('mousedown', e => {
+    if (e.target.closest('.map-controls') || e.target.closest('.map-overlay')) return;
+    mapIsPanning = true; mapLastX = e.clientX; mapLastY = e.clientY;
+    container.classList.add('panning');
+  });
+  window.addEventListener('mousemove', e => {
+    if (!mapIsPanning) return;
+    mapPanX += e.clientX - mapLastX; mapPanY += e.clientY - mapLastY;
+    mapLastX = e.clientX; mapLastY = e.clientY;
+    applyMapTransform();
+  });
+  window.addEventListener('mouseup', () => { mapIsPanning = false; container.classList.remove('panning'); });
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    mapZoom(e.deltaY < 0 ? 1.15 : 0.87);
+  }, { passive: false });
+  // Touch support
+  let lastTouchDist = null;
+  container.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) { mapIsPanning = true; mapLastX = e.touches[0].clientX; mapLastY = e.touches[0].clientY; }
+  });
+  container.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && mapIsPanning) {
+      mapPanX += e.touches[0].clientX - mapLastX; mapPanY += e.touches[0].clientY - mapLastY;
+      mapLastX = e.touches[0].clientX; mapLastY = e.touches[0].clientY;
+      applyMapTransform();
+    } else if (e.touches.length === 2) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (lastTouchDist) mapZoom(d / lastTouchDist);
+      lastTouchDist = d;
+    }
+  }, { passive: false });
+  container.addEventListener('touchend', () => { mapIsPanning = false; lastTouchDist = null; });
+}
+
+function drawMap() {
+  const svg = document.getElementById('worldMapSVG');
+  if (!svg) return;
+  const markersG = document.getElementById('cityMarkers');
+  const pingsG = document.getElementById('pingRings');
+  if (!markersG || !pingsG) return;
+  markersG.innerHTML = '';
+  pingsG.innerHTML = '';
+
+  Object.entries(CITY_SVG).forEach(([id, pos]) => {
+    const d = CITIES[id];
+    const isActive = id === currentCity;
+    const col = d.color;
+    const r = isActive ? 10 : 7;
+
+    // Ping animation for active city
+    if (isActive) {
+      [20, 32, 44].forEach((pr, i) => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        circle.setAttribute('cx', pos.x);
+        circle.setAttribute('cy', pos.y);
+        circle.setAttribute('r', pr);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', col);
+        circle.setAttribute('stroke-width', '1');
+        circle.setAttribute('opacity', (0.5 - i*0.15).toString());
+        circle.style.animation = `svgPing 2.4s ${i*0.5}s infinite`;
+        pingsG.appendChild(circle);
+      });
+    }
+
+    // Glow halo
+    const halo = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    halo.setAttribute('cx', pos.x); halo.setAttribute('cy', pos.y);
+    halo.setAttribute('r', r + 6);
+    halo.setAttribute('fill', col); halo.setAttribute('opacity', '0.12');
+    markersG.appendChild(halo);
+
+    // Main dot
+    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx', pos.x); dot.setAttribute('cy', pos.y);
+    dot.setAttribute('r', r);
+    dot.setAttribute('fill', col);
+    dot.setAttribute('opacity', isActive ? '1' : '0.75');
+    dot.setAttribute('filter', isActive ? 'url(#bigGlow)' : 'url(#glow)');
+    dot.style.cursor = 'pointer';
+    dot.addEventListener('click', () => {
+      const btn = [...document.querySelectorAll('.city-btn')].find(b => b.textContent.includes(CITIES[id].name.split(',')[0]));
+      if (btn) selectCity(id, btn);
+    });
+    markersG.appendChild(dot);
+
+    // Inner white dot
+    const inner = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    inner.setAttribute('cx', pos.x); inner.setAttribute('cy', pos.y);
+    inner.setAttribute('r', isActive ? 3 : 2);
+    inner.setAttribute('fill', '#fff');
+    markersG.appendChild(inner);
+
+    // City name label
+    const labelBg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    const lx = pos.x + r + 5, ly = pos.y - 8;
+    labelBg.setAttribute('x', lx - 2); labelBg.setAttribute('y', ly);
+    labelBg.setAttribute('rx', '3');
+    labelBg.setAttribute('fill', 'rgba(5,10,15,0.7)');
+    // We size after text render, skip for SVG simplicity
+
+    const nameText = document.createElementNS('http://www.w3.org/2000/svg','text');
+    nameText.setAttribute('x', pos.x + r + 6);
+    nameText.setAttribute('y', pos.y - 2);
+    nameText.setAttribute('font-size', isActive ? '11' : '9');
+    nameText.setAttribute('font-weight', isActive ? 'bold' : 'normal');
+    nameText.setAttribute('fill', isActive ? '#fff' : col);
+    nameText.setAttribute('font-family', "JetBrains Mono, monospace");
+    nameText.textContent = pos.label;
+    markersG.appendChild(nameText);
+
+    // Risk % label
+    const riskText = document.createElementNS('http://www.w3.org/2000/svg','text');
+    riskText.setAttribute('x', pos.x + r + 6);
+    riskText.setAttribute('y', pos.y + 10);
+    riskText.setAttribute('font-size', isActive ? '10' : '8');
+    riskText.setAttribute('font-weight', 'bold');
+    riskText.setAttribute('fill', col);
+    riskText.setAttribute('font-family', "Syne, sans-serif");
+    riskText.textContent = d.risk + '% risk';
+    markersG.appendChild(riskText);
+
+    // Connector line from city to label
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', pos.x + r); line.setAttribute('y1', pos.y);
+    line.setAttribute('x2', pos.x + r + 5); line.setAttribute('y2', pos.y - 2);
+    line.setAttribute('stroke', col); line.setAttribute('stroke-width', '0.5'); line.setAttribute('opacity','0.5');
+    markersG.appendChild(line);
+  });
+}
+
+// Inject SVG ping keyframes
+const svgStyle = document.createElement('style');
+svgStyle.textContent = `
+  @keyframes svgPing {
+    0% { transform: scale(0.4); opacity: 0.8; }
+    70% { transform: scale(1); opacity: 0; }
+    100% { transform: scale(0.4); opacity: 0; }
+  }
+`;
+document.head.appendChild(svgStyle);
+
+// ════════════════════════════════════════
+// ANALYSIS CHARTS
+// ════════════════════════════════════════
+function initAnalysisCharts() {
+  const d = CITIES[currentCity];
+  const years = ['2018','2019','2020','2021','2022','2023','2024','2025'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
+
+  const cfg = (type, labels, datasets, opts={}) => ({
+    type, data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#4a6070', font: { size: 10 } } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4a6070', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4a6070', font: { size: 10 } } }
+      },
+      ...opts
+    }
+  });
+
+  // Traffic
+  destroyChart('trafficChart');
+  charts.traffic = new Chart('trafficChart', cfg('line', years, [{
+    label: 'Daily Traffic (×1000)',
+    data: d.trafficData,
+    borderColor: '#00c8ff', backgroundColor: 'rgba(0,200,255,0.08)',
+    fill: true, tension: 0.4, pointRadius: 3,
+  }, {
+    label: 'Design Capacity (×1000)',
+    data: d.trafficData.map(() => Math.round(d.traffic * 0.75 / 1000)),
+    borderColor: 'rgba(255,74,107,0.5)', borderDash: [4,4],
+    pointRadius: 0, fill: false,
+  }]));
+
+  // AQI
+  destroyChart('aqiChart');
+  charts.aqi = new Chart('aqiChart', cfg('bar', months, [{
+    label: 'AQI',
+    data: d.aqiData,
+    backgroundColor: d.aqiData.map(v => v > 150 ? 'rgba(255,74,107,0.7)' : v > 100 ? 'rgba(255,183,0,0.7)' : 'rgba(0,255,157,0.7)'),
+    borderRadius: 4,
+  }]));
+
+  // Flood
+  destroyChart('floodChart');
+  charts.flood = new Chart('floodChart', cfg('bar', years, [{
+    label: 'Flood Events',
+    data: d.floodData,
+    backgroundColor: 'rgba(0,200,255,0.6)', borderRadius: 4,
+  }]));
+
+  // Structural Decay Projection
+  destroyChart('decayChart');
+  const decayStart = 100 - d.risk;
+  const projYears = ['2026','2027','2028','2029','2030','2031','2032','2033'];
+  const decayRate = (d.risk / 100) * 8;
+  const decayData = projYears.map((y,i) => Math.max(0, decayStart - decayRate * (i+1)));
+  const failThresh = 20;
+  charts.decay = new Chart('decayChart', cfg('line', projYears, [{
+    label: 'Structural Integrity (%)',
+    data: decayData,
+    borderColor: decayData.map(v => v < failThresh ? '#ff4a6b' : v < 40 ? '#ffb700' : '#00ff9d'),
+    backgroundColor: 'rgba(0,200,255,0.05)',
+    fill: true, tension: 0.3, pointRadius: 4,
+    segment: { borderColor: ctx => ctx.p1.parsed.y < failThresh ? '#ff4a6b' : ctx.p1.parsed.y < 40 ? '#ffb700' : '#00ff9d' }
+  }, {
+    label: 'Failure Threshold (20%)',
+    data: projYears.map(() => failThresh),
+    borderColor: 'rgba(255,74,107,0.4)', borderDash: [5,5],
+    pointRadius: 0, fill: false,
+  }]));
+
+  // Risk factor breakdown
+  const rb = document.getElementById('riskBreakdown');
+  if (rb) {
+    const factors = [
+      { label: 'Traffic Stress', val: Math.round(d.traffic/2000), color: '#ff4a6b' },
+      { label: 'Flood Risk', val: Math.round(d.flood*7), color: '#00c8ff' },
+      { label: 'Air Quality Impact', val: Math.round(d.aqi/3), color: '#ffb700' },
+      { label: 'Heavy Vehicle Load', val: d.heavy, color: '#ff4a6b' },
+      { label: 'Infrastructure Age', val: Math.round(d.age), color: '#ffb700' },
+      { label: 'Rainfall Exposure', val: Math.round(d.rainfall/50), color: '#00c8ff' },
+    ];
+    rb.innerHTML = factors.map(f => `
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:11px;color:var(--text);width:120px;flex-shrink:0;">${f.label}</div>
+        <div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${Math.min(100,f.val)}%;background:${f.color};border-radius:4px;transition:width 1.2s ease;"></div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);width:32px;text-align:right;">${Math.min(100,f.val)}%</div>
+      </div>
+    `).join('');
+  }
+
+  // City stats
+  const cs = document.getElementById('cityStats');
+  if (cs) {
+    const stats = [
+      { label: 'Road Age', val: d.age + ' yrs', color: '#ffb700' },
+      { label: 'Material', val: d.material, color: '#00c8ff' },
+      { label: 'Annual Rainfall', val: d.rainfall + 'mm', color: '#00c8ff' },
+      { label: 'Failure ETA', val: d.failETA, color: '#ff4a6b' },
+      { label: 'Confidence', val: '89%', color: '#00ff9d' },
+      { label: 'Carbon Impact', val: d.carbonCost, color: '#ff4a6b' },
+    ];
+    cs.innerHTML = stats.map(s => `
+      <div style="display:flex;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px solid var(--border);">
+        <span style="font-size:12px;color:var(--muted);">${s.label}</span>
+        <span style="font-family:var(--font-mono);font-size:12px;color:${s.color};">${s.val}</span>
+      </div>
+    `).join('');
+  }
+
+  // Environmental impact
+  const env = document.getElementById('envImpact');
+  if (env) {
+    const impacts = [
+      { icon: '🫁', label: 'Health Risk', val: d.aqi > 150 ? 'Severe' : d.aqi > 100 ? 'Moderate' : 'Low', sub: `AQI ${d.aqi} – ${d.aqi > 150 ? 'Hazardous exposure' : 'Unhealthy for sensitive groups'}`, color: d.aqi > 150 ? '#ff4a6b' : '#ffb700' },
+      { icon: '🌍', label: 'CO₂ Delay Cost', val: d.carbonCost, sub: 'Annual carbon emissions from traffic detours and delays', color: '#ff4a6b' },
+      { icon: '💰', label: 'GDP Impact', val: d.risk > 70 ? 'High' : d.risk > 40 ? 'Medium' : 'Low', sub: `Est. ${d.risk > 70 ? '1.2-2.8' : d.risk > 40 ? '0.4-1.2' : '0.1-0.4'}% regional GDP at risk`, color: '#ffb700' },
+      { icon: '🔋', label: 'Energy Loss', val: (d.traffic/1000 * 0.08).toFixed(1) + 'M kWh/yr', sub: 'Excess fuel consumption due to poor road surface and detours', color: '#00c8ff' },
+    ];
+    env.innerHTML = impacts.map(i => `
+      <div style="text-align:center;padding:16px;background:var(--panel);border-radius:10px;border:1px solid var(--border);">
+        <div style="font-size:28px;margin-bottom:6px;">${i.icon}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${i.label}</div>
+        <div style="font-family:var(--font-head);font-size:18px;font-weight:700;color:${i.color};margin-bottom:6px;">${i.val}</div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.4;">${i.sub}</div>
+      </div>
+    `).join('');
+  }
+
+  // Comparative chart
+  destroyChart('compareChart');
+  const cityNames = Object.values(CITIES).map(c => c.name.split(',')[0]);
+  const cityRisks = Object.values(CITIES).map(c => c.risk);
+  const cityColors = Object.values(CITIES).map(c => c.color + 'bb');
+  charts.compare = new Chart('compareChart', cfg('bar', cityNames, [{
+    label: 'Risk Score (%)',
+    data: cityRisks,
+    backgroundColor: cityColors, borderRadius: 6,
+  }], { indexAxis: 'y' }));
+
+  // SHAP
+  renderSHAP();
+  // Cost table
+  renderCostTable();
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  const c = document.getElementById(id);
+  if (c) { const p = c.parentNode; p.removeChild(c); const nc = document.createElement('canvas'); nc.id = id; p.appendChild(nc); }
+}
+
+function renderSHAP() {
+  const d = CITIES[currentCity];
+  const weights = [0.30, 0.20, 0.15, 0.10, 0.08, 0.15, -0.12, -0.10, 0.10, 0.08];
+  const norm = d.risk / 100;
+  const container = document.getElementById('shapBars');
+  container.innerHTML = SHAP_FEATURES.map((f, i) => {
+    const val = (weights[i] * norm).toFixed(3);
+    const w = Math.abs(weights[i]) * 100;
+    return `<div class="shap-bar">
+      <div class="shap-label">${f.label}</div>
+      <div class="shap-track">
+        <div class="shap-fill ${weights[i] > 0 ? 'shap-fill-pos' : 'shap-fill-neg'}" style="width:${w}%"></div>
+      </div>
+      <div class="shap-val">${val > 0 ? '+' : ''}${val}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderCostTable() {
+  const d = CITIES[currentCity];
+  const table = document.getElementById('costTable');
+  const colors = { CRITICAL: '#ff4a6b', HIGH: '#ffb700', MEDIUM: '#00c8ff', LOW: '#00ff9d' };
+  // Calculate ROI
+  table.innerHTML = `<thead><tr>
+    <th>#</th><th>Action</th><th>Timeline</th><th>Est. Cost</th><th>Savings if Delayed</th><th>ROI</th><th>Priority</th>
+  </tr></thead><tbody>${d.costs.map(c => {
+    // Extract numbers for ROI calculation
+    const costNum = parseFloat(c.cost.replace(/[^\d.]/g,'')) || 1;
+    const saveNum = parseFloat(c.savings.replace(/[^\d.]/g,'')) || 1;
+    const roi = (saveNum / costNum).toFixed(1);
+    return `<tr>
+    <td><span class="cost-rank rank-${c.rank}">${c.rank}</span></td>
+    <td style="font-weight:500">${c.action}</td>
+    <td style="color:var(--muted)">${c.timeline}</td>
+    <td style="font-family:var(--font-mono);color:#fff">${c.cost}</td>
+    <td style="font-family:var(--font-mono);color:${colors[c.priority]}">${c.savings}</td>
+    <td style="font-family:var(--font-mono);color:var(--accent3)">${roi}×</td>
+    <td><span style="padding:3px 8px;border-radius:4px;font-size:11px;font-family:var(--font-mono);background:${colors[c.priority]}20;color:${colors[c.priority]}">${c.priority}</span></td>
+  </tr>`;}).join('')}</tbody>`;
+}
+
+// ════════════════════════════════════════
+// IMAGE UPLOAD + DAMAGE DETECTION
+// ════════════════════════════════════════
+
+// Infrastructure type detection heuristic (simulated CNN classification)
+const INFRA_TYPES_DETECT = [
+  { type: 'road', label: '🛣️ Road / Highway', keywords: ['road','highway','asphalt','pavement','pothole','lane','street','path'] },
+  { type: 'bridge', label: '🌉 Bridge / Flyover', keywords: ['bridge','flyover','arch','suspension','cable','overpass','viaduct'] },
+  { type: 'pipeline', label: '🔧 Pipeline / Conduit', keywords: ['pipe','pipeline','conduit','tube','duct','sewer','drain'] },
+  { type: 'building', label: '🏗️ Building / Structure', keywords: ['building','wall','facade','concrete','structure','foundation'] },
+  { type: 'manhole', label: '🕳️ Manhole / Cover', keywords: ['manhole','cover','sewer','drain','utility','access'] },
+];
+
+// Damage profiles differ by infra type
+const INFRA_DAMAGE_PROFILES = {
+  road:     { crack:[55,90], pothole:[40,90], wear:[50,85], water:[15,55], deform:[10,40] },
+  bridge:   { crack:[30,70], pothole:[5,20],  wear:[25,60], water:[40,80], deform:[35,75] },
+  pipeline: { crack:[20,60], pothole:[5,15],  wear:[15,45], water:[50,90], deform:[20,65] },
+  building: { crack:[45,80], pothole:[0,10],  wear:[20,55], water:[30,70], deform:[40,80] },
+  manhole:  { crack:[30,70], pothole:[10,40], wear:[40,75], water:[25,65], deform:[15,45] },
+};
+
+const REJECTED_KEYWORDS = ['person','face','animal','food','pet','cat','dog','flower','car interior','selfie'];
+
+function handleDrag(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag');
+  const files = e.dataTransfer.files;
+  if (files.length) Array.from(files).forEach(f => processImage(f));
+}
+function handleFile(e) {
+  if (e.target.files.length) Array.from(e.target.files).forEach(f => processImage(f));
+}
+
+function resetUpload() {
+  // Add another image - just reset the upload zone to show prompt again and allow new upload
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInput').click();
+}
+
+function processImage(file) {
+  const errorBanner = document.getElementById('errorBanner');
+  errorBanner.style.display = 'none';
+  const detectionBanner = document.getElementById('detectionBanner');
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    errorBanner.style.display = 'block';
+    errorBanner.innerHTML = '❌ Invalid file type. Please upload a PNG, JPG, or WebP image.';
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    errorBanner.style.display = 'block';
+    errorBanner.innerHTML = '❌ File too large (max 10MB). Please compress the image and try again.';
+    return;
+  }
+
+  // Simulate CNN classification - random but weighted toward infrastructure types
+  // In production this would call the FastAPI /predict/image endpoint
+  const rand = Math.random();
+  let detectedType;
+  if (rand < 0.08) {
+    // Simulate rejection ~8% of the time for demonstration
+    errorBanner.style.display = 'block';
+    errorBanner.innerHTML = `❌ <strong>Non-infrastructure image detected.</strong> Our CNN classifier identified this image as containing non-infrastructure content (confidence: ${(75 + Math.random()*20).toFixed(0)}%). Please upload images of roads, bridges, pipelines, buildings, or manholes only.`;
+    return;
+  }
+  const types = Object.keys(INFRA_DAMAGE_PROFILES);
+  detectedType = types[Math.floor(Math.random() * types.length)];
+
+  const typeInfo = INFRA_TYPES_DETECT.find(t => t.type === detectedType);
+  const confidence = (82 + Math.random() * 15).toFixed(0);
+  detectionBanner.style.display = 'block';
+  detectionBanner.style.background = 'rgba(0,200,255,0.08)';
+  detectionBanner.style.border = '1px solid rgba(0,200,255,0.25)';
+  detectionBanner.style.color = 'var(--accent)';
+  detectionBanner.innerHTML = `✅ Infrastructure detected: <strong style="color:#fff;">${typeInfo.label}</strong> — Classification confidence: <strong>${confidence}%</strong>`;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    // Add to gallery
+    const galleryEntry = { src: ev.target.result, type: detectedType, file: file.name };
+    uploadedImages.push(galleryEntry);
+    activeImageIndex = uploadedImages.length - 1;
+    renderGallery();
+    showImageScan(galleryEntry, detectedType);
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderGallery() {
+  const gallery = document.getElementById('imageGallery');
+  gallery.innerHTML = uploadedImages.map((img, i) => `
+    <div onclick="selectGalleryImage(${i})" style="position:relative;cursor:pointer;border-radius:8px;overflow:hidden;width:72px;height:72px;flex-shrink:0;border:2px solid ${i===activeImageIndex?'var(--accent)':'var(--border)'};transition:border-color 0.2s;">
+      <img src="${img.src}" style="width:100%;height:100%;object-fit:cover;" />
+      <div style="position:absolute;bottom:2px;left:2px;font-size:12px;">${INFRA_TYPES_DETECT.find(t=>t.type===img.type)?.label.split(' ')[0]||'📸'}</div>
+      <div style="position:absolute;top:2px;right:2px;width:16px;height:16px;background:rgba(5,10,15,0.8);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;" onclick="removeGalleryImage(event,${i})">✕</div>
+    </div>
+  `).join('') + `
+    <div onclick="document.getElementById('fileInput').click()" style="width:72px;height:72px;flex-shrink:0;border:2px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;transition:border-color 0.2s;font-size:10px;color:var(--muted);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:20px;">+</div><div>Add</div>
+    </div>
+  `;
+}
+
+function selectGalleryImage(i) {
+  activeImageIndex = i;
+  renderGallery();
+  showImageScan(uploadedImages[i], uploadedImages[i].type);
+}
+
+function removeGalleryImage(e, i) {
+  e.stopPropagation();
+  uploadedImages.splice(i, 1);
+  if (activeImageIndex >= uploadedImages.length) activeImageIndex = uploadedImages.length - 1;
+  renderGallery();
+  if (uploadedImages.length === 0) {
+    document.getElementById('damageResults').style.display = 'none';
+    document.getElementById('uploadPrompt').style.display = 'block';
+    document.getElementById('damageCanvas').style.display = 'none';
+    document.getElementById('detectionBanner').style.display = 'none';
+  } else {
+    selectGalleryImage(activeImageIndex);
+  }
+}
+
+function showImageScan(entry, detectedType) {
+  const zone = document.getElementById('uploadZone');
+  const canvas = document.getElementById('damageCanvas');
+  const prompt = document.getElementById('uploadPrompt');
+  zone.classList.add('has-image');
+  prompt.style.display = 'none';
+
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    runDamageDetection(ctx, canvas.width, canvas.height, detectedType);
+  };
+  img.src = entry.src;
+}
+
+function runDamageDetection(ctx, W, H, detectedType) {
+  const profile = INFRA_DAMAGE_PROFILES[detectedType] || INFRA_DAMAGE_PROFILES.road;
+
+  // Heatmap overlay
+  const numSpots = 8 + Math.floor(Math.random() * 10);
+  for (let i = 0; i < numSpots; i++) {
+    const x = Math.random() * W, y = Math.random() * H;
+    const r = 20 + Math.random() * 70;
+    const severity = Math.random();
+    const color = severity > 0.65 ? '255,74,107' : severity > 0.35 ? '255,183,0' : '0,200,255';
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0, `rgba(${color},0.65)`);
+    grd.addColorStop(1, `rgba(${color},0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // Scan lines
+  ctx.strokeStyle = 'rgba(0,200,255,0.08)'; ctx.lineWidth = 1;
+  for (let y = 0; y < H; y += 4) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  const rng = (lo, hi) => Math.floor(lo + Math.random() * (hi - lo));
+  const crack = rng(...profile.crack);
+  const pothole = rng(...profile.pothole);
+  const wear = rng(...profile.wear);
+  const water = rng(...profile.water);
+  const deform = rng(...profile.deform);
+  const overall = Math.round(crack * 0.30 + pothole * 0.20 + wear * 0.18 + water * 0.17 + deform * 0.15);
+
+  const fmt = v => v > 70 ? `<span style="color:var(--accent2)">${v}% — Severe</span>` :
+                    v > 40 ? `<span style="color:var(--warn)">${v}% — Moderate</span>` :
+                             `<span style="color:var(--accent3)">${v}% — Mild</span>`;
+
+  const typeInfo = INFRA_TYPES_DETECT.find(t => t.type === detectedType);
+  document.getElementById('dr-infra-type').textContent = `TYPE DETECTED: ${typeInfo?.label.toUpperCase() || 'INFRASTRUCTURE'}`;
+  document.getElementById('dr-crack').innerHTML = fmt(crack);
+  document.getElementById('dr-pothole').innerHTML = fmt(pothole);
+  document.getElementById('dr-wear').innerHTML = fmt(wear);
+  document.getElementById('dr-water').innerHTML = fmt(water);
+  document.getElementById('dr-deform').innerHTML = fmt(deform);
+  document.getElementById('dr-overall').innerHTML = `<span style="color:${overall>65?'#ff4a6b':overall>35?'#ffb700':'#00ff9d'};font-family:var(--font-head);font-size:24px;font-weight:800">${overall}%</span>`;
+
+  const infraRec = {
+    road: 'pavement condition index inspection and CBR testing',
+    bridge: 'load testing and non-destructive evaluation (NDE)',
+    pipeline: 'CCTV pipe inspection and pressure testing',
+    building: 'structural engineer assessment and crack monitoring gauges',
+    manhole: 'confined-space entry inspection and load capacity test',
+  };
+  const baseRec = overall > 65 ? `🚨 <strong>Critical damage detected.</strong> Immediate ${infraRec[detectedType]||'assessment'} required. Consider temporary closure pending repair.` :
+    overall > 35 ? `⚠️ <strong>Significant damage identified.</strong> Schedule ${infraRec[detectedType]||'assessment'} within 3–6 months. Monthly monitoring recommended.` :
+    `✅ <strong>Minor wear detected.</strong> Include in next scheduled maintenance. Re-inspect in 12 months.`;
+  document.getElementById('dr-recommendation').innerHTML = baseRec;
+  document.getElementById('damageResults').style.display = 'block';
+}
+
+// ════════════════════════════════════════
+// ALERTS (city-filtered)
+// ════════════════════════════════════════
+const ALERT_TEMPLATES = [
+  { type: 'CRITICAL', text: 'Bridge load sensor threshold exceeded — Eastern Highway', city: 'mumbai' },
+  { type: 'CRITICAL', text: 'Rapid AQI spike (210 AQI) detected — surface oxidation risk elevated', city: 'mumbai' },
+  { type: 'HIGH', text: 'Flood warning issued — 3 infrastructure segments at risk of subsidence', city: 'mumbai' },
+  { type: 'CRITICAL', text: 'Pothole cluster detected — AI model predicts 87% failure probability', city: 'mumbai' },
+  { type: 'HIGH', text: 'Mahim Causeway load monitoring: 18% above threshold', city: 'mumbai' },
+  { type: 'INFO', text: 'Western Express Hwy drainage inspection completed — 12 blockages found', city: 'mumbai' },
+  { type: 'HIGH', text: 'Traffic surge 140% above baseline — accelerated wear predicted', city: 'newyork' },
+  { type: 'HIGH', text: 'Water main pressure anomaly detected near bridge foundation — NYC', city: 'newyork' },
+  { type: 'CRITICAL', text: 'Brooklyn Bridge cable corrosion alert — East tower, zone 3', city: 'newyork' },
+  { type: 'INFO', text: 'FDR Drive lane closure: emergency pothole patching underway', city: 'newyork' },
+  { type: 'MEDIUM', text: 'Freeze-thaw cycle warning: 48hr pavement damage forecast', city: 'newyork' },
+  { type: 'HIGH', text: 'Katraj Flyover vibration anomaly — axle load exceeded 40T', city: 'pune' },
+  { type: 'CRITICAL', text: 'Mula-Mutha river level: flood alert, 2 roads at risk', city: 'pune' },
+  { type: 'HIGH', text: 'Ring road surface failure — pothole depth >12cm, km 34-36', city: 'pune' },
+  { type: 'INFO', text: 'Hinjewadi expressway speed sensor installed — monitoring active', city: 'pune' },
+  { type: 'INFO', text: 'Scheduled maintenance completed — Route 27 structural integrity improved', city: 'tokyo' },
+  { type: 'INFO', text: 'Satellite imagery updated — Tokyo highway network rescanned', city: 'tokyo' },
+  { type: 'HIGH', text: 'Seismic micro-event registered — expressway joints flagged for review', city: 'tokyo' },
+  { type: 'INFO', text: 'Shuto Expressway: predictive maintenance cycle initiated', city: 'tokyo' },
+];
+
+let alertQueue = [...ALERT_TEMPLATES];
+let alertIndex = 0;
+
+function setAlertFilter(severity, btn) {
+  alertSeverityFilter = severity;
+  document.querySelectorAll('.alert-filter-btn').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.opacity = '0.6';
+  });
+  btn.style.background = 'rgba(0,200,255,0.1)';
+  btn.style.opacity = '1';
+  const list = document.getElementById('alertList');
+  list.innerHTML = '';
+  const filtered = alertQueue.filter(a => (a.city === currentCity || a.city === 'all') && (severity === 'all' || a.type === severity));
+  filtered.slice(0, 8).forEach(a => addAlert(list, a));
+}
+
+function initAlerts() {
+  const d = CITIES[currentCity];
+  const lbl = document.getElementById('alertCityLabel');
+  if (lbl) lbl.textContent = d.name.split(',')[0];
+
+  alertSeverityFilter = 'all';
+  // Reset filter buttons
+  document.querySelectorAll('.alert-filter-btn').forEach((b,i) => {
+    b.style.opacity = i===0 ? '1' : '0.6';
+    b.style.background = i===0 ? 'rgba(0,200,255,0.1)' : 'transparent';
+  });
+
+  const list = document.getElementById('alertList');
+  list.innerHTML = '';
+  const cityAlerts = alertQueue.filter(a => a.city === currentCity || a.city === 'all');
+  cityAlerts.slice(0, 8).forEach(a => addAlert(list, a));
+
+  // Stats chart - city specific counts
+  const critCount = cityAlerts.filter(a => a.type === 'CRITICAL').length;
+  const highCount = cityAlerts.filter(a => a.type === 'HIGH').length;
+  const infoCount = cityAlerts.filter(a => a.type === 'INFO' || a.type === 'MEDIUM').length;
+
+  destroyChart('alertChart');
+  charts.alertChart = new Chart('alertChart', {
+    type: 'doughnut',
+    data: {
+      labels: ['Critical', 'High', 'Info/Med'],
+      datasets: [{ data: [critCount, highCount, infoCount], backgroundColor: ['rgba(255,74,107,0.8)','rgba(255,183,0,0.7)','rgba(0,200,255,0.6)'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: '#4a6070', font: { size: 10 } } } }
+    }
+  });
+
+  // Summary
+  const summary = document.getElementById('alertSummary');
+  if (summary) {
+    summary.innerHTML = `
+      <div style="display:flex;justify-content:space-between;padding:6px 10px;background:rgba(255,74,107,0.08);border-radius:6px;font-size:12px;">
+        <span style="color:var(--muted)">Critical</span><span style="color:#ff4a6b;font-family:var(--font-mono);">${critCount} alerts</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 10px;background:rgba(255,183,0,0.07);border-radius:6px;font-size:12px;">
+        <span style="color:var(--muted)">High</span><span style="color:#ffb700;font-family:var(--font-mono);">${highCount} alerts</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 10px;background:rgba(0,200,255,0.06);border-radius:6px;font-size:12px;">
+        <span style="color:var(--muted)">Info / Medium</span><span style="color:#00c8ff;font-family:var(--font-mono);">${infoCount} alerts</span>
+      </div>
+    `;
+  }
+
+  renderSourceStatus();
+  if (alertInterval) clearInterval(alertInterval);
+  alertInterval = setInterval(() => {
+    const pool = alertQueue.filter(a => a.city === currentCity && (alertSeverityFilter === 'all' || a.type === alertSeverityFilter));
+    if (!pool.length) return;
+    alertIndex = (alertIndex + 1) % pool.length;
+    addAlert(list, pool[alertIndex], true);
+    if (list.children.length > 15) list.removeChild(list.lastChild);
+  }, 3500);
+}
+
+function addAlert(list, alert, prepend = false) {
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+  const el = document.createElement('div');
+  const type = alert.type === 'MEDIUM' ? 'HIGH' : alert.type;
+  el.className = `alert-item alert-${type}`;
+  el.innerHTML = `<div class="alert-dot"></div><div style="flex:1">${alert.text}</div><div class="alert-time">${time}</div>`;
+  if (prepend) list.insertBefore(el, list.firstChild);
+  else list.appendChild(el);
+}
+
+function renderSourceStatus() {
+  const sources = [
+    { name: 'Traffic APIs', status: 'LIVE', icon: '🚗', color: '#00ff9d' },
+    { name: 'OpenWeather AQI', status: 'LIVE', icon: '💨', color: '#00ff9d' },
+    { name: 'NASA Satellite', status: 'LIVE', icon: '🛰️', color: '#00ff9d' },
+    { name: 'NOAA Flood', status: 'CACHED', icon: '🌊', color: '#ffb700' },
+    { name: 'OSM Traffic', status: 'LIVE', icon: '🗺', color: '#00ff9d' },
+  ];
+  document.getElementById('sourceStatus').innerHTML = sources.map(s => `
+    <div style="text-align:center;padding:16px;background:var(--panel2);border-radius:10px;border:1px solid var(--border);">
+      <div style="font-size:24px;margin-bottom:8px">${s.icon}</div>
+      <div style="font-size:12px;font-weight:500;color:#fff;margin-bottom:6px">${s.name}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;border-radius:4px;display:inline-block;background:${s.color}20;color:${s.color}">${s.status}</div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════
+// PDF REPORT (simulated)
+// ════════════════════════════════════════
+function generatePDF() {
+  const d = CITIES[currentCity];
+  const recs = (INFRA_RECS[currentCity] && INFRA_RECS[currentCity][currentInfra]) || d.recs;
+  const content = `INFRAGUARD AI – INFRASTRUCTURE HEALTH REPORT
+============================================
+Generated: ${new Date().toLocaleDateString()}
+City: ${d.name}
+Infrastructure Type: ${INFRA_LABELS[currentInfra]}
+
+EXECUTIVE SUMMARY
+─────────────────
+Failure Probability: ${d.risk + INFRA_TWEAKS[currentInfra]}%
+Risk Level: ${d.level}
+Predicted Failure: ${d.failETA}
+Confidence Score: 89%
+Model: XGBoost + CNN Ensemble v2.1
+
+KEY INDICATORS
+──────────────
+Daily Traffic Count: ${(d.traffic/1000).toFixed(0)}K vehicles
+AQI Level: ${d.aqi}
+Flood Events (5yr): ${d.flood}
+Heavy Vehicle Ratio: ${d.heavy}%
+Infrastructure Age: ${d.age} years
+Material: ${d.material}
+Annual Rainfall: ${d.rainfall}mm
+Carbon Impact: ${d.carbonCost}
+
+RISK SCORE FORMULA
+──────────────────
+0.28 × traffic_load + 0.18 × flood_frequency
++ 0.14 × AQI_level + 0.12 × heavy_vehicle_ratio
++ 0.10 × road_age + 0.10 × image_damage_score
++ 0.08 × rainfall_trend → Sigmoid → ${d.risk + INFRA_TWEAKS[currentInfra]}% Failure Probability
+
+TOP RECOMMENDATIONS (${INFRA_LABELS[currentInfra]})
+───────────────────
+${recs.map((r,i) => `${i+1}. [${r.priority}] ${r.title}\n   ${r.desc}`).join('\n\n')}
+
+PREVENTIVE COST ANALYSIS
+────────────────────────
+${d.costs.map(c => `#${c.rank} ${c.action}\n   Cost: ${c.cost} | Potential Savings: ${c.savings} | Timeline: ${c.timeline}`).join('\n\n')}
+
+Carbon Emission Impact of Delay: ${d.carbonCost}
+
+─────────────────────────────────────────────
+InfraGuard AI | Powered by XGBoost + CNN Ensemble
+Data Sources: Google Traffic API, OpenWeather, NASA EarthData, WAQI, Sentinel-2
+`;
+
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `InfraGuard_${currentCity}_${currentInfra}_Report.txt`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+window.addEventListener('load', () => {
+  updateDashboard();
+  setTimeout(() => animateGauge(CITIES[currentCity].risk), 200);
+  setTimeout(() => initMapPan(), 500);
+});
+
+window.addEventListener('resize', () => { drawMap(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+version: "3.9"
+
+services:
+  # ── FastAPI application ──────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql+asyncpg://infraguard:${POSTGRES_PASSWORD:-infraguard_secret}@postgres:5432/infraguard
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/1
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./ml/weights:/app/ml/weights
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Celery worker (background tasks) ────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A utils.tasks.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql+asyncpg://infraguard:${POSTGRES_PASSWORD:-infraguard_secret}@postgres:5432/infraguard
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/1
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  # ── Celery beat (periodic scheduler) ────────────────────────
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A utils.tasks.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/1
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # ── Redis (cache + Celery broker) ───────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── PostgreSQL (persistent storage) ─────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: infraguard
+      POSTGRES_USER: infraguard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infraguard_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infraguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Celery Flower monitor (optional) ────────────────────────
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A utils.tasks.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    env_file:
+      - .env
+    environment:
+      - CELERY_BROKER=redis://redis:6379/0
+    depends_on:
+      - redis
+      - worker
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
