@@ -1,0 +1,7 @@
+path: C:/Users/anish/OneDrive/Desktop/InfraGuard AI 3/ig2/data/pothole_yolo
+
+train: train/images
+val: valid/images
+
+nc: 1
+names: ['pothole']

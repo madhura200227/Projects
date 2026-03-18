@@ -1,0 +1,233 @@
+{
+  "summary": {
+    "count": 1,
+    "infra_type_accuracy": 1.0,
+    "pothole_count_accuracy": 1.0,
+    "damage_mae_avg": 19.2,
+    "evaluated": {
+      "infra_type_items": 1,
+      "pothole_count_items": 1,
+      "damage_items": 1
+    }
+  },
+  "items": [
+    {
+      "image_path": "ig2/data/test_synthetic.jpg",
+      "infra_type_ok": true,
+      "pothole_count_ok": true,
+      "damage_mae": 19.2,
+      "details": {
+        "predict_image": {
+          "infra": {
+            "detected_type": "road",
+            "confidence": 0.0,
+            "probabilities": {
+              "road": 0.5,
+              "bridge": 0.15,
+              "pipeline": 0.15,
+              "building": 0.1,
+              "manhole": 0.1
+            },
+            "method": "fallback"
+          },
+          "damage": {
+            "crack": 38.9,
+            "pothole": 21.5,
+            "wear": 30.8,
+            "water": 20.0,
+            "deformation": 7.2
+          }
+        },
+        "pothole": {
+          "status": "success",
+          "timestamp": "2026-02-27T00:19:33.206762",
+          "potholes_detected": 3,
+          "potholes": [
+            {
+              "id": 1,
+              "detection": {
+                "bbox": [
+                  150,
+                  200,
+                  251,
+                  281
+                ],
+                "confidence": 0.848,
+                "class": 0,
+                "area_pixels": 6292,
+                "center": [
+                  200,
+                  240
+                ],
+                "circularity": 0.884
+              },
+              "severity_score": 52.3,
+              "severity_level": "MEDIUM",
+              "estimated_area_cm2": 62.9,
+              "estimated_depth_cm": 9.4,
+              "repair_urgency": "Within 1 week",
+              "danger_level": "Moderate - Discomfort, minor vehicle wear"
+            },
+            {
+              "id": 2,
+              "detection": {
+                "bbox": [
+                  400,
+                  150,
+                  451,
+                  191
+                ],
+                "confidence": 0.829,
+                "class": 0,
+                "area_pixels": 1574,
+                "center": [
+                  425,
+                  170
+                ],
+                "circularity": 0.885
+              },
+              "severity_score": 37.8,
+              "severity_level": "LOW",
+              "estimated_area_cm2": 15.7,
+              "estimated_depth_cm": 6.7,
+              "repair_urgency": "Within 1 month",
+              "danger_level": "Low - Cosmetic concern, minimal impact"
+            },
+            {
+              "id": 3,
+              "detection": {
+                "bbox": [
+                  300,
+                  350,
+                  331,
+                  376
+                ],
+                "confidence": 0.812,
+                "class": 0,
+                "area_pixels": 589,
+                "center": [
+                  315,
+                  363
+                ],
+                "circularity": 0.889
+              },
+              "severity_score": 32.9,
+              "severity_level": "LOW",
+              "estimated_area_cm2": 5.9,
+              "estimated_depth_cm": 5.7,
+              "repair_urgency": "Within 1 month",
+              "danger_level": "Low - Cosmetic concern, minimal impact"
+            }
+          ],
+          "overall_condition": "FAIR",
+          "average_severity": 41.0,
+          "max_severity": 52.3,
+          "failure_risk_score": 34.7,
+          "traffic_impact": {
+            "jam_probability": 0.284,
+            "jam_risk": "LOW",
+            "speed_reduction_pct": 17,
+            "lane_blockage": false,
+            "pothole_count": 3,
+            "avg_severity": 41.0,
+            "estimated_delay_minutes": 4
+          },
+          "repair_instructions": [
+            {
+              "step": 1,
+              "title": "Safety Setup & Traffic Control",
+              "description": "Set up traffic cones 50m before pothole. Use warning signs. Single-lane closure acceptable for low traffic.",
+              "duration": "15-30 minutes",
+              "equipment": [
+                "Traffic cones",
+                "Warning signs",
+                "Safety vest",
+                "Flaggers (if needed)"
+              ],
+              "priority": "CRITICAL"
+            },
+            {
+              "step": 2,
+              "title": "Pothole Cleaning & Preparation",
+              "description": "Remove all loose debris, dirt, and water from pothole. Use compressed air or broom. For depth 9.4cm, ensure edges are clean and vertical.",
+              "duration": "10-20 minutes",
+              "equipment": [
+                "Broom",
+                "Compressed air",
+                "Shop vacuum",
+                "Wire brush"
+              ],
+              "priority": "HIGH"
+            },
+            {
+              "step": 3,
+              "title": "Apply Tack Coat",
+              "description": "Apply asphalt emulsion tack coat to bottom and sides. Essential for depth >9.4cm to ensure bonding. Let cure 5-10 minutes.",
+              "duration": "10-15 minutes",
+              "equipment": [
+                "Asphalt emulsion",
+                "Brush or spray applicator"
+              ],
+              "priority": "HIGH"
+            },
+            {
+              "step": 4,
+              "title": "Fill with Cold-patch asphalt",
+              "description": "Use polymer-modified cold patch. Apply in layers, max 5cm per lift. Total depth 9.4cm requires 2 lifts.",
+              "duration": "20-40 minutes",
+              "equipment": [
+                "Cold-patch asphalt",
+                "Shovel",
+                "Rake",
+                "Tamper"
+              ],
+              "priority": "CRITICAL"
+            },
+            {
+              "step": 5,
+              "title": "Compaction",
+              "description": "Compact fill material using Hand tamper. Overfill by 1-2cm to account for settling. Make 3-5 passes for proper density.",
+              "duration": "15-25 minutes",
+              "equipment": [
+                "Hand tamper",
+                "Level"
+              ],
+              "priority": "CRITICAL"
+            },
+            {
+              "step": 6,
+              "title": "Edge Sealing",
+              "description": "Apply rubberized crack sealant around perimeter to prevent water infiltration. Critical for longevity.",
+              "duration": "10-15 minutes",
+              "equipment": [
+                "Crack sealant",
+                "Applicator gun"
+              ],
+              "priority": "MEDIUM"
+            },
+            {
+              "step": 7,
+              "title": "Quality Check & Traffic Restoration",
+              "description": "Verify repair is level with surrounding pavement (\u00b15mm). Check compaction. Remove traffic control. Monitor for 24-48 hours.",
+              "duration": "10 minutes",
+              "equipment": [
+                "Level",
+                "Measuring tape"
+              ],
+              "priority": "MEDIUM"
+            }
+          ],
+          "estimated_repair_cost": {
+            "total_usd": 250.63,
+            "material_cost": 0.63,
+            "labor_cost": 150,
+            "equipment_cost": 100,
+            "area_m2": 0.01,
+            "cost_per_m2": 75
+          },
+          "recommended_action": "\ud83d\udccb Plan repairs within 2-4 weeks. Add to maintenance schedule."
+        }
+      }
+    }
+  ]
+}

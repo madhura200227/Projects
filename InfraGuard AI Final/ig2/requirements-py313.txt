@@ -1,0 +1,51 @@
+# InfraGuard AI v2 – Python 3.13 compatible deps
+#
+# Use this if your system Python is 3.13 (Windows) and the pinned `requirements.txt`
+# does not resolve cleanly.
+#
+# Install (recommended in a fresh venv at repo root):
+#   py -3.13 -m venv .venv
+#   .venv\Scripts\python -m pip install -U pip
+#   .venv\Scripts\python -m pip install -r ig2\requirements-py313.txt
+
+fastapi
+uvicorn[standard]
+python-multipart
+websockets
+
+pydantic
+pydantic-settings
+
+httpx[http2]
+aioredis
+
+asyncpg
+sqlalchemy[asyncio]
+alembic
+
+numpy
+pandas
+scikit-learn
+xgboost
+scipy
+
+Pillow
+opencv-python-headless
+
+# Training / fine-tuning (optional but recommended for accuracy)
+torch
+torchvision
+ultralytics
+pyyaml
+
+python-dotenv
+orjson
+anyio
+tenacity
+
+pytest
+pytest-asyncio
+coverage
+black
+ruff
+

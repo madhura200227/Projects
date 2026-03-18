@@ -1,0 +1,2 @@
+{"image_path":"ig2/data/test_synthetic.jpg","expect":{"infra_type":"road","damage":{"crack":20,"pothole":60,"wear":20,"water":0,"deformation":15},"potholes_detected":3}}
+
